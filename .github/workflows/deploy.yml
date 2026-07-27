@@ -77,32 +77,32 @@ jobs:
             cd '$DEPLOY_PATH'
             current_app_key=\$(sed -n 's/^APP_KEY=\(base64:[A-Za-z0-9+\/=]*\)\r\?$/\1/p' .env 2>/dev/null | head -n 1 || true)
             clean_env=\$(mktemp .env.deploy.XXXXXX)
-            chmod 600 "\$clean_env"
+            chmod 600 \"\$clean_env\"
 
             write_env() {
-              key="\$1"
-              encoded="\$2"
-              value=\$(printf '%s' "\$encoded" | base64 -d)
-              printf '%s=%s\\n' "\$key" "\$value" >> "\$clean_env"
+              key=\"\$1\"
+              encoded=\"\$2\"
+              value=\$(printf '%s' \"\$encoded\" | base64 -d)
+              printf '%s=%s\\n' \"\$key\" \"\$value\" >> \"\$clean_env\"
             }
 
-            write_env APP_NAME IlVzZWQgTWFya2V0cGxhY2UiCg==
-            write_env APP_ENV InByb2R1Y3Rpb24iCg==
-            write_env APP_DEBUG ImZhbHNlIgo=
-            write_env APP_URL Imh0dHBzOi8vdXNlZC5wbS5zYSIK
-            write_env LOG_CHANNEL InN0YWNrIgo=
-            write_env LOG_LEVEL ImVycm9yIgo=
-            write_env DB_CONNECTION Im15c3FsIgo=
+            write_env APP_NAME VXNlZE1hcmtldHBsYWNl
+            write_env APP_ENV cHJvZHVjdGlvbg==
+            write_env APP_DEBUG ZmFsc2U=
+            write_env APP_URL aHR0cHM6Ly91c2VkLnBtLnNh
+            write_env LOG_CHANNEL c3RhY2s=
+            write_env LOG_LEVEL ZXJyb3I=
+            write_env DB_CONNECTION bXlzcWw=
             write_env DB_HOST '$DB_HOST_B64'
             write_env DB_PORT '$DB_PORT_B64'
             write_env DB_DATABASE '$DB_DATABASE_B64'
             write_env DB_USERNAME '$DB_USERNAME_B64'
             write_env DB_PASSWORD '$DB_PASSWORD_B64'
 
-            if [ -n "\$current_app_key" ]; then
-              printf 'APP_KEY=%s\\n' "\$current_app_key" >> "\$clean_env"
+            if [ -n \"\$current_app_key\" ]; then
+              printf 'APP_KEY=%s\\n' \"\$current_app_key\" >> \"\$clean_env\"
             fi
-            mv -f "\$clean_env" .env
+            mv -f \"\$clean_env\" .env
 
             php artisan optimize:clear
             if ! grep -q '^APP_KEY=base64:' .env; then php artisan key:generate --force; fi
