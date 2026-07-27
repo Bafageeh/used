@@ -66,13 +66,39 @@ jobs:
           DB_USERNAME: ${{ secrets.DB_USERNAME }}
           DB_PASSWORD: ${{ secrets.DB_PASSWORD }}
         run: |
+          encode_secret() { printf '%s' "$1" | base64 -w 0; }
+          DB_HOST_B64="$(encode_secret "$DB_HOST")"
+          DB_PORT_B64="$(encode_secret "$DB_PORT")"
+          DB_DATABASE_B64="$(encode_secret "$DB_DATABASE")"
+          DB_USERNAME_B64="$(encode_secret "$DB_USERNAME")"
+          DB_PASSWORD_B64="$(encode_secret "$DB_PASSWORD")"
+
           ssh -i ~/.ssh/used_deploy_key -p "$SERVER_PORT" "$SERVER_USER@$SERVER_HOST" "set -e
             cd '$DEPLOY_PATH'
-            sed -i 's|^APP_ENV=.*|APP_ENV=production|; s|^APP_DEBUG=.*|APP_DEBUG=false|; s|^APP_URL=.*|APP_URL=https://used.pm.sa|; s|^DB_CONNECTION=.*|DB_CONNECTION=mysql|; s|^DB_HOST=.*|DB_HOST=$DB_HOST|; s|^DB_PORT=.*|DB_PORT=$DB_PORT|; s|^DB_DATABASE=.*|DB_DATABASE=$DB_DATABASE|; s|^DB_USERNAME=.*|DB_USERNAME=$DB_USERNAME|; s|^DB_PASSWORD=.*|DB_PASSWORD=$DB_PASSWORD|' .env
+            touch .env
+
+            set_env() {
+              key=\"$1\"
+              encoded=\"$2\"
+              value=$(printf '%s' \"$encoded\" | base64 -d)
+              sed -i \"/^${key}=/d\" .env
+              printf '%s=%s\\n' \"$key\" \"$value\" >> .env
+            }
+
+            set_env APP_ENV cHJvZHVjdGlvbg==
+            set_env APP_DEBUG ZmFsc2U=
+            set_env APP_URL aHR0cHM6Ly91c2VkLnBtLnNh
+            set_env DB_CONNECTION bXlzcWw=
+            set_env DB_HOST '$DB_HOST_B64'
+            set_env DB_PORT '$DB_PORT_B64'
+            set_env DB_DATABASE '$DB_DATABASE_B64'
+            set_env DB_USERNAME '$DB_USERNAME_B64'
+            set_env DB_PASSWORD '$DB_PASSWORD_B64'
+
+            php artisan optimize:clear
             if ! grep -q '^APP_KEY=base64:' .env; then php artisan key:generate --force; fi
             php artisan migrate --force
             php artisan storage:link || test -L public/storage
-            php artisan optimize:clear
             php artisan optimize"
 
       - name: Verify API
