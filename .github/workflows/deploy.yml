@@ -75,28 +75,38 @@ jobs:
 
           ssh -i ~/.ssh/used_deploy_key -p "$SERVER_PORT" "$SERVER_USER@$SERVER_HOST" "set -e
             cd '$DEPLOY_PATH'
-            touch .env
+            current_app_key=\$(sed -n 's/^APP_KEY=\(base64:[A-Za-z0-9+\/=]*\)\r\?$/\1/p' .env 2>/dev/null | head -n 1 || true)
+            clean_env=\$(mktemp .env.deploy.XXXXXX)
+            chmod 600 "\$clean_env"
 
-            set_env() {
-              key=\"\$1\"
-              encoded=\"\$2\"
-              value=\$(printf '%s' \"\$encoded\" | base64 -d)
-              sed -i \"/^\${key}=/d\" .env
-              printf '%s=%s\\n' \"\$key\" \"\$value\" >> .env
+            write_env() {
+              key="\$1"
+              encoded="\$2"
+              value=\$(printf '%s' "\$encoded" | base64 -d)
+              printf '%s=%s\\n' "\$key" "\$value" >> "\$clean_env"
             }
 
-            set_env APP_ENV InByb2R1Y3Rpb24iCg==
-            set_env APP_DEBUG ImZhbHNlIgo=
-            set_env APP_URL Imh0dHBzOi8vdXNlZC5wbS5zYSIK
-            set_env DB_CONNECTION Im15c3FsIgo=
-            set_env DB_HOST '$DB_HOST_B64'
-            set_env DB_PORT '$DB_PORT_B64'
-            set_env DB_DATABASE '$DB_DATABASE_B64'
-            set_env DB_USERNAME '$DB_USERNAME_B64'
-            set_env DB_PASSWORD '$DB_PASSWORD_B64'
+            write_env APP_NAME IlVzZWQgTWFya2V0cGxhY2UiCg==
+            write_env APP_ENV InByb2R1Y3Rpb24iCg==
+            write_env APP_DEBUG ImZhbHNlIgo=
+            write_env APP_URL Imh0dHBzOi8vdXNlZC5wbS5zYSIK
+            write_env LOG_CHANNEL InN0YWNrIgo=
+            write_env LOG_LEVEL ImVycm9yIgo=
+            write_env DB_CONNECTION Im15c3FsIgo=
+            write_env DB_HOST ''$DB_HOST_B64'
+            write_env DB_PORT ''$DB_PORT_B64'
+            write_env DB_DATABASE ''$DB_DATABASE_B64'
+            write_env DB_USERNAME ''$DB_USERNAME_B64'
+            write_env DB_PASSWORD ''$DB_PASSWORD_B64'
+
+            if [ -n "\$current_app_key" ]; then
+              printf 'APP_KEY=%s\\n' "\$current_app_key" >> "\$clean_env"
+            fi
+            mv -f "\$clean_env" .env
 
             php artisan optimize:clear
             if ! grep -q '^APP_KEY=base64:' .env; then php artisan key:generate --force; fi
+            php artisan about --only=environment
             php artisan migrate --force
             php artisan storage:link || test -L public/storage
             php artisan optimize"
