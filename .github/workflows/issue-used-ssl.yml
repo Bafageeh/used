@@ -1,0 +1,56 @@
+name: Issue SSL for used.pm.sa
+
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - ".github/workflows/issue-used-ssl.yml"
+
+jobs:
+  issue-ssl:
+    runs-on: ubuntu-latest
+    environment: production
+    steps:
+      - name: Configure SSH
+        env:
+          SERVER_SSH_KEY: ${{ secrets.SERVER_SSH_KEY }}
+          SERVER_HOST: ${{ secrets.SERVER_HOST }}
+          SERVER_PORT: ${{ secrets.SERVER_PORT }}
+        run: |
+          install -m 700 -d ~/.ssh
+          printf '%s\n' "$SERVER_SSH_KEY" > ~/.ssh/used_deploy_key
+          chmod 600 ~/.ssh/used_deploy_key
+          ssh-keyscan -p "$SERVER_PORT" -H "$SERVER_HOST" >> ~/.ssh/known_hosts
+
+      - name: Request AutoSSL certificate
+        env:
+          SERVER_HOST: ${{ secrets.SERVER_HOST }}
+          SERVER_PORT: ${{ secrets.SERVER_PORT }}
+          SERVER_USER: ${{ secrets.SERVER_USER }}
+        run: |
+          ssh -i ~/.ssh/used_deploy_key -p "$SERVER_PORT" "$SERVER_USER@$SERVER_HOST" '
+            set -e
+            domain_ip="$(getent ahostsv4 used.pm.sa | awk "NR==1 {print \$1}")"
+            test -n "$domain_ip"
+            echo "used.pm.sa resolves to $domain_ip"
+            /usr/local/cpanel/bin/autossl_check --user=pmsa
+          '
+
+      - name: Verify certificate
+        env:
+          SERVER_HOST: ${{ secrets.SERVER_HOST }}
+          SERVER_PORT: ${{ secrets.SERVER_PORT }}
+          SERVER_USER: ${{ secrets.SERVER_USER }}
+        run: |
+          ssh -i ~/.ssh/used_deploy_key -p "$SERVER_PORT" "$SERVER_USER@$SERVER_HOST" '
+            for attempt in $(seq 1 12); do
+              certificate="$(timeout 10 openssl s_client -connect used.pm.sa:443 -servername used.pm.sa </dev/null 2>/dev/null | openssl x509 -noout -subject -issuer -dates 2>/dev/null || true)"
+              if printf "%s" "$certificate" | grep -q "used.pm.sa"; then
+                printf "%s\n" "$certificate"
+                exit 0
+              fi
+              sleep 10
+            done
+            echo "AutoSSL request completed, but the certificate is still being processed."
+            exit 1
+          '
