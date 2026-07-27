@@ -54,18 +54,22 @@ jobs:
           set -euo pipefail
 
           DOMAIN="used.pm.sa"
+          SUBDOMAIN="used"
+          ROOT_DOMAIN="pm.sa"
           CPANEL_USER="pmsa"
           DOCUMENT_ROOT="${DEPLOY_PATH}/public"
 
           install -d -m 755 "$DOCUMENT_ROOT"
 
-          if uapi --user="$CPANEL_USER" Domains list_domains --output=json |
-             tr -d '\n' | grep -Fq "\"$DOMAIN\""; then
+          domains="$(/usr/local/cpanel/bin/uapi --user="$CPANEL_USER" DomainInfo list_domains --output=json)"
+          if printf '%s' "$domains" | tr -d '\n' | grep -Fq "\"$DOMAIN\""; then
             echo "$DOMAIN already exists."
           else
-            result="$(uapi --user="$CPANEL_USER" Domains add_domain \
-              domain="$DOMAIN" \
-              document_root="$DOCUMENT_ROOT" \
+            result="$(/usr/local/cpanel/bin/uapi --user="$CPANEL_USER" SubDomain addsubdomain \
+              domain="$SUBDOMAIN" \
+              rootdomain="$ROOT_DOMAIN" \
+              dir="$DOCUMENT_ROOT" \
+              disallowdot=1 \
               --output=json)"
             printf '%s\n' "$result"
             printf '%s' "$result" | grep -Eq '"status"[[:space:]]*:[[:space:]]*1' || {
