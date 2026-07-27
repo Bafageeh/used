@@ -93,11 +93,11 @@ jobs:
             write_env LOG_CHANNEL InN0YWNrIgo=
             write_env LOG_LEVEL ImVycm9yIgo=
             write_env DB_CONNECTION Im15c3FsIgo=
-            write_env DB_HOST ''$DB_HOST_B64'
-            write_env DB_PORT ''$DB_PORT_B64'
-            write_env DB_DATABASE ''$DB_DATABASE_B64'
-            write_env DB_USERNAME ''$DB_USERNAME_B64'
-            write_env DB_PASSWORD ''$DB_PASSWORD_B64'
+            write_env DB_HOST '$DB_HOST_B64'
+            write_env DB_PORT '$DB_PORT_B64'
+            write_env DB_DATABASE '$DB_DATABASE_B64'
+            write_env DB_USERNAME '$DB_USERNAME_B64'
+            write_env DB_PASSWORD '$DB_PASSWORD_B64'
 
             if [ -n "\$current_app_key" ]; then
               printf 'APP_KEY=%s\\n' "\$current_app_key" >> "\$clean_env"
