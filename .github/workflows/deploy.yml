@@ -99,9 +99,27 @@ jobs:
             if ! grep -q '^APP_KEY=base64:' .env; then php artisan key:generate --force; fi
             php artisan migrate --force
             php artisan storage:link || test -L public/storage
+            mkdir -p storage/framework/cache storage/framework/sessions storage/framework/views storage/logs bootstrap/cache
+            find storage bootstrap/cache database -type d -exec chmod 775 {} \;
+            find storage bootstrap/cache database -type f -exec chmod 664 {} \;
+            chmod 600 .env
             php artisan optimize
             php artisan about --only=environment
             php artisan migrate:status"
 
       - name: Verify API
-        run: curl --fail --retry 5 --retry-delay 5 https://used.pm.sa/api/health
+        env:
+          SERVER_HOST: ${{ secrets.SERVER_HOST }}
+          SERVER_PORT: ${{ secrets.SERVER_PORT }}
+          SERVER_USER: ${{ secrets.SERVER_USER }}
+          DEPLOY_PATH: ${{ secrets.DEPLOY_PATH }}
+        run: |
+          if ! curl --silent --show-error --fail --retry 5 --retry-delay 5 https://used.pm.sa/api/health; then
+            echo "API health check failed. Showing Laravel and web-server diagnostics."
+            ssh -i ~/.ssh/used_deploy_key -p "$SERVER_PORT" "$SERVER_USER@$SERVER_HOST" "cd '$DEPLOY_PATH'
+              php artisan about --only=environment || true
+              tail -n 120 storage/logs/laravel.log 2>/dev/null || true
+              tail -n 80 ~/logs/used.pm.sa.php.error.log 2>/dev/null || true
+              tail -n 80 ~/logs/error_log 2>/dev/null || true"
+            exit 1
+          fi
