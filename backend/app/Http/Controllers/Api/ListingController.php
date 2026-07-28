@@ -22,7 +22,13 @@ class ListingController extends Controller
  }
  public function show(Listing $listing) {
   abort_unless($listing->status==='published' || auth('sanctum')->id()===$listing->user_id,404);
-  return $listing->load(['category','images','user:id,name']);
+  if ($listing->status === 'published' && auth('sanctum')->id() !== $listing->user_id) $listing->increment('views_count');
+  $listing->load(['category','images','user:id,name,phone']);
+  if (!$listing->show_phone) $listing->user->makeHidden('phone');
+  return $listing;
+ }
+ public function mine(Request $request) {
+  return $request->user()->listings()->with(['category:id,name,slug','images'])->latest()->paginate(20);
  }
  public function store(Request $request) {
   $data=$this->validated($request); $data['user_id']=$request->user()->id;
@@ -43,6 +49,7 @@ class ListingController extends Controller
    'description'=>['required','string','max:5000'],'price'=>['nullable','numeric','min:0'],
    'city'=>['required','string','max:80'],'latitude'=>['nullable','numeric','between:-90,90'],
    'longitude'=>['nullable','numeric','between:-180,180'],'status'=>['required',Rule::in(['draft','published','sold','archived'])],
+   'show_phone'=>['sometimes','boolean'],
   ]);
  }
 }
