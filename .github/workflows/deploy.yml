@@ -85,9 +85,9 @@ jobs:
               printf '%s\n' 'LOG_CHANNEL=stack'
               printf '%s\n' 'LOG_LEVEL=error'
               printf '%s\n' 'DB_CONNECTION=sqlite'
-              printf '%s\n' 'CACHE_STORE=database'
-              printf '%s\n' 'SESSION_DRIVER=database'
-              printf '%s\n' 'QUEUE_CONNECTION=database'
+              printf '%s\n' 'CACHE_STORE=file'
+              printf '%s\n' 'SESSION_DRIVER=file'
+              printf '%s\n' 'QUEUE_CONNECTION=sync'
             } > \"\$clean_env\"
 
             if [ -n \"\$current_app_key\" ]; then
