@@ -104,7 +104,7 @@ jobs:
           ssh -i ~/.ssh/used_deploy_key -p "$SERVER_PORT" "$SERVER_USER@$SERVER_HOST" "set -e
             test -f '$DEPLOY_PATH/public/index.php'
             mkdir -p '$domain_root'
-            printf '%s' 'PD9waHAKCmlmIChpc3NldCgkX0dFVFsnZGVwbG95X3J1bnRpbWVfcHJvYmUnXSkgJiYgaGFzaF9lcXVhbHMoJ3VzZWQtcnVudGltZS12MycsIChzdHJpbmcpICRfR0VUWydkZXBsb3lfcnVudGltZV9wcm9iZSddKSkgewogICAgaGVhZGVyKCdDb250ZW50LVR5cGU6IGFwcGxpY2F0aW9uL2pzb24nKTsKICAgIGVjaG8ganNvbl9lbmNvZGUoWwogICAgICAgICdwaHBfdmVyc2lvbicgPT4gUEhQX1ZFUlNJT04sCiAgICAgICAgJ3NhcGknID0+IFBIUF9TQVBJLAogICAgICAgICdwZG9fc3FsaXRlJyA9PiBleHRlbnNpb25fbG9hZGVkKCdwZG9fc3FsaXRlJyksCiAgICAgICAgJ29wZW5zc2wnID0+IGV4dGVuc2lvbl9sb2FkZWQoJ29wZW5zc2wnKSwKICAgIF0pOwogICAgZXhpdDsKfQoKcmVxdWlyZSAnX19VU0VEX0FQUF9QVUJMSUNfSU5ERVhfXyc7Cg==' | base64 -d > '$domain_root/index.php'
+            printf '%s' 'PD9waHAKCmlmIChpc3NldCgkX0dFVFsnZGVwbG95X3J1bnRpbWVfcHJvYmUnXSkgJiYgaGFzaF9lcXVhbHMoJ3VzZWQtcnVudGltZS12NCcsIChzdHJpbmcpICRfR0VUWydkZXBsb3lfcnVudGltZV9wcm9iZSddKSkgewogICAgaGVhZGVyKCdDb250ZW50LVR5cGU6IGFwcGxpY2F0aW9uL2pzb24nKTsKICAgIGVjaG8ganNvbl9lbmNvZGUoWydwaHBfdmVyc2lvbicgPT4gUEhQX1ZFUlNJT04sICdzYXBpJyA9PiBQSFBfU0FQSSwgJ3Bkb19zcWxpdGUnID0+IGV4dGVuc2lvbl9sb2FkZWQoJ3Bkb19zcWxpdGUnKSwgJ29wZW5zc2wnID0+IGV4dGVuc2lvbl9sb2FkZWQoJ29wZW5zc2wnKV0pOwogICAgZXhpdDsKfQokcGF0aCA9IHBhcnNlX3VybCgkX1NFUlZFUlsnUkVRVUVTVF9VUkknXSA/PyAnLycsIFBIUF9VUkxfUEFUSCk7CmlmICgkcGF0aCA9PT0gJy8nIHx8ICRwYXRoID09PSAnJykgewogICAgaGVhZGVyKCdDb250ZW50LVR5cGU6IHRleHQvaHRtbDsgY2hhcnNldD1VVEYtOCcpOwogICAgZWNobyAnPCFkb2N0eXBlIGh0bWw+PGh0bWwgbGFuZz0iYXIiIGRpcj0icnRsIj48aGVhZD48bWV0YSBjaGFyc2V0PSJ1dGYtOCI+PG1ldGEgbmFtZT0idmlld3BvcnQiIGNvbnRlbnQ9IndpZHRoPWRldmljZS13aWR0aCxpbml0aWFsLXNjYWxlPTEiPjx0aXRsZT7Zhdiz2KrYudmF2YQg2YXYrNin2YbZijwvdGl0bGU+PHN0eWxlPip7Ym94LXNpemluZzpib3JkZXItYm94fWJvZHl7bWFyZ2luOjA7bWluLWhlaWdodDoxMDB2aDtkaXNwbGF5OmdyaWQ7cGxhY2UtaXRlbXM6Y2VudGVyO2JhY2tncm91bmQ6I2Y2ZjdmOTtjb2xvcjojMTcyMDJhO2ZvbnQtZmFtaWx5OlRhaG9tYSxBcmlhbCxzYW5zLXNlcmlmfS5jYXJke3dpZHRoOm1pbig5MiUsNTIwcHgpO3BhZGRpbmc6NDJweCAzMHB4O3RleHQtYWxpZ246Y2VudGVyO2JhY2tncm91bmQ6I2ZmZjtib3JkZXItcmFkaXVzOjI0cHg7Ym94LXNoYWRvdzowIDE4cHggNTBweCByZ2JhKDAsMCwwLC4wOCl9LmxvZ297d2lkdGg6NzJweDtoZWlnaHQ6NzJweDttYXJnaW46YXV0bztkaXNwbGF5OmdyaWQ7cGxhY2UtaXRlbXM6Y2VudGVyO2JvcmRlci1yYWRpdXM6MjJweDtiYWNrZ3JvdW5kOiMxNDdkNjQ7Y29sb3I6I2ZmZjtmb250LXNpemU6MzRweDtmb250LXdlaWdodDo3MDB9aDF7bWFyZ2luOjIycHggMCAxMHB4O2ZvbnQtc2l6ZTozMHB4fXB7bWFyZ2luOjA7Y29sb3I6IzY1NzE3ZDtsaW5lLWhlaWdodDoxLjl9LnN0YXR1c3tkaXNwbGF5OmlubGluZS1mbGV4O2FsaWduLWl0ZW1zOmNlbnRlcjtnYXA6OHB4O21hcmdpbi10b3A6MjRweDtwYWRkaW5nOjEwcHggMTZweDtib3JkZXItcmFkaXVzOjk5OXB4O2JhY2tncm91bmQ6I2VhZjhmMztjb2xvcjojMTQ3ZDY0O2ZvbnQtd2VpZ2h0OjcwMH0uZG90e3dpZHRoOjlweDtoZWlnaHQ6OXB4O2JvcmRlci1yYWRpdXM6NTAlO2JhY2tncm91bmQ6IzE4YTk3OX08L3N0eWxlPjwvaGVhZD48Ym9keT48bWFpbiBjbGFzcz0iY2FyZCI+PGRpdiBjbGFzcz0ibG9nbyI+2YU8L2Rpdj48aDE+2YXYs9iq2LnZhdmEINmF2KzYp9mG2Yo8L2gxPjxwPtmF2YbYtdipINiz2YfZhNipINmI2KLZhdmG2Kkg2YTYudix2LYg2YjYtNix2KfYoSDYp9mE2YXZhtiq2KzYp9iqINin2YTZhdiz2KrYudmF2YTYqS48L3A+PGRpdiBjbGFzcz0ic3RhdHVzIj48c3BhbiBjbGFzcz0iZG90Ij48L3NwYW4+INin2YTYrtiv2YXYqSDYqti52YXZhDwvZGl2PjwvbWFpbj48L2JvZHk+PC9odG1sPic7CiAgICBleGl0Owp9CnJlcXVpcmUgJ19fVVNFRF9BUFBfUFVCTElDX0lOREVYX18nOwo=' | base64 -d > '$domain_root/index.php'
             sed -i 's|__USED_APP_PUBLIC_INDEX__|$DEPLOY_PATH/public/index.php|' '$domain_root/index.php'
             printf '%s' 'PElmTW9kdWxlIG1vZF9yZXdyaXRlLmM+CiAgICBSZXdyaXRlRW5naW5lIE9uCiAgICBSZXdyaXRlQ29uZCAle1JFUVVFU1RfRklMRU5BTUV9ICEtZAogICAgUmV3cml0ZUNvbmQgJXtSRVFVRVNUX0ZJTEVOQU1FfSAhLWYKICAgIFJld3JpdGVSdWxlIF4gaW5kZXgucGhwIFtMXQo8L0lmTW9kdWxlPgo=' | base64 -d > '$domain_root/.htaccess'
             chmod 644 '$domain_root/index.php' '$domain_root/.htaccess'
@@ -186,7 +186,7 @@ jobs:
         run: |
           response_file=$(mktemp)
           probe_file=$(mktemp)
-          probe_status=$(curl --silent --show-error --output "$probe_file" --write-out '%{http_code}' 'https://used.pm.sa/index.php?deploy_runtime_probe=used-runtime-v3' || true)
+          probe_status=$(curl --silent --show-error --output "$probe_file" --write-out '%{http_code}' 'https://used.pm.sa/index.php?deploy_runtime_probe=used-runtime-v4' || true)
           echo "Web PHP probe through index.php: HTTP $probe_status"
           cat "$probe_file" || true
           echo
@@ -219,3 +219,11 @@ jobs:
             exit 1
           fi
           cat "$response_file"
+          home_file=$(mktemp)
+          home_status=$(curl --silent --show-error --location --retry 3 --retry-delay 3 --output "$home_file" --write-out '%{http_code}' https://used.pm.sa/ || true)
+          echo
+          echo "Homepage check: HTTP $home_status"
+          if [ "$home_status" != "200" ]; then
+            sed -n '1,40p' "$home_file" || true
+            exit 1
+          fi
