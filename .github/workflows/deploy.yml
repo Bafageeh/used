@@ -3,7 +3,7 @@ name: Deploy Used Marketplace
 on:
   push:
     branches: [main]
-    paths: ["backend/**", ".github/workflows/deploy.yml"]
+    paths: ["api/**", ".github/workflows/deploy.yml"]
   workflow_dispatch:
 
 concurrency:
@@ -47,11 +47,11 @@ jobs:
               rm -rf \"\$BOOTSTRAP_DIR\" /tmp/used-laravel-bootstrap.tgz
             fi
             test -f '$DEPLOY_PATH/artisan'"
-          tar -C backend -czf /tmp/used-backend.tgz .
-          scp -i ~/.ssh/used_deploy_key -P "$SERVER_PORT" /tmp/used-backend.tgz "$SERVER_USER@$SERVER_HOST:/tmp/used-backend.tgz"
+          tar -C api -czf /tmp/used-api.tgz .
+          scp -i ~/.ssh/used_deploy_key -P "$SERVER_PORT" /tmp/used-api.tgz "$SERVER_USER@$SERVER_HOST:/tmp/used-api.tgz"
           ssh -i ~/.ssh/used_deploy_key -p "$SERVER_PORT" "$SERVER_USER@$SERVER_HOST" "set -e
-            tar -C '$DEPLOY_PATH' -xzf /tmp/used-backend.tgz
-            rm -f /tmp/used-backend.tgz
+            tar -C '$DEPLOY_PATH' -xzf /tmp/used-api.tgz
+            rm -f /tmp/used-api.tgz
             printf '%s' 'PD9waHAKCmlmIChpc3NldCgkX0dFVFsnZGVwbG95X3J1bnRpbWVfcHJvYmUnXSkgJiYgaGFzaF9lcXVhbHMoJ3VzZWQtcnVudGltZS12MicsIChzdHJpbmcpICRfR0VUWydkZXBsb3lfcnVudGltZV9wcm9iZSddKSkgewogICAgaGVhZGVyKCdDb250ZW50LVR5cGU6IGFwcGxpY2F0aW9uL2pzb24nKTsKICAgIGVjaG8ganNvbl9lbmNvZGUoWwogICAgICAgICdwaHBfdmVyc2lvbicgPT4gUEhQX1ZFUlNJT04sCiAgICAgICAgJ3NhcGknID0+IFBIUF9TQVBJLAogICAgICAgICdwZG9fc3FsaXRlJyA9PiBleHRlbnNpb25fbG9hZGVkKCdwZG9fc3FsaXRlJyksCiAgICAgICAgJ29wZW5zc2wnID0+IGV4dGVuc2lvbl9sb2FkZWQoJ29wZW5zc2wnKSwKICAgIF0pOwogICAgZXhpdDsKfQoKcmVxdWlyZSBfX0RJUl9fLicvcHVibGljL2luZGV4LnBocCc7Cg==' | base64 -d > '$DEPLOY_PATH/index.php'
             printf '%s' 'PElmTW9kdWxlIG1vZF9yZXdyaXRlLmM+CiAgICBSZXdyaXRlRW5naW5lIE9uCiAgICBSZXdyaXRlQ29uZCAle1JFUVVFU1RfRklMRU5BTUV9ICEtZAogICAgUmV3cml0ZUNvbmQgJXtSRVFVRVNUX0ZJTEVOQU1FfSAhLWYKICAgIFJld3JpdGVSdWxlIF4gaW5kZXgucGhwIFtMXQo8L0lmTW9kdWxlPgo=' | base64 -d > '$DEPLOY_PATH/.htaccess'
             chmod 644 '$DEPLOY_PATH/index.php' '$DEPLOY_PATH/.htaccess'
