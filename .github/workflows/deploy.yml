@@ -52,7 +52,7 @@ jobs:
           ssh -i ~/.ssh/used_deploy_key -p "$SERVER_PORT" "$SERVER_USER@$SERVER_HOST" "set -e
             tar -C '$DEPLOY_PATH' -xzf /tmp/used-backend.tgz
             rm -f /tmp/used-backend.tgz
-            printf '%s' 'PD9waHAKCnVzZSBJbGx1bWluYXRlXEh0dHBcUmVxdWVzdDsKCmRlZmluZSgnTEFSQVZFTF9TVEFSVCcsIG1pY3JvdGltZSh0cnVlKSk7CgppZiAoZmlsZV9leGlzdHMoJG1haW50ZW5hbmNlID0gX19ESVJfXy4nL3N0b3JhZ2UvZnJhbWV3b3JrL21haW50ZW5hbmNlLnBocCcpKSB7CiAgICByZXF1aXJlICRtYWludGVuYW5jZTsKfQoKcmVxdWlyZSBfX0RJUl9fLicvdmVuZG9yL2F1dG9sb2FkLnBocCc7CgokYXBwID0gcmVxdWlyZV9vbmNlIF9fRElSX18uJy9ib290c3RyYXAvYXBwLnBocCc7CgokYXBwLT5oYW5kbGVSZXF1ZXN0KFJlcXVlc3Q6OmNhcHR1cmUoKSk7Cg==' | base64 -d > '$DEPLOY_PATH/index.php'
+            printf '%s' 'PD9waHAKCmlmIChpc3NldCgkX1NFUlZFUlsnSFRUUF9YX0RFUExPWV9SVU5USU1FX1BST0JFJ10pICYmIGhhc2hfZXF1YWxzKCd1c2VkLXJ1bnRpbWUtdjEnLCAkX1NFUlZFUlsnSFRUUF9YX0RFUExPWV9SVU5USU1FX1BST0JFJ10pKSB7CiAgICBoZWFkZXIoJ0NvbnRlbnQtVHlwZTogYXBwbGljYXRpb24vanNvbicpOwogICAgZWNobyBqc29uX2VuY29kZShbCiAgICAgICAgJ3BocF92ZXJzaW9uJyA9PiBQSFBfVkVSU0lPTiwKICAgICAgICAnc2FwaScgPT4gUEhQX1NBUEksCiAgICAgICAgJ3Bkb19zcWxpdGUnID0+IGV4dGVuc2lvbl9sb2FkZWQoJ3Bkb19zcWxpdGUnKSwKICAgICAgICAnb3BlbnNzbCcgPT4gZXh0ZW5zaW9uX2xvYWRlZCgnb3BlbnNzbCcpLAogICAgXSk7CiAgICBleGl0Owp9Cgp1c2UgSWxsdW1pbmF0ZVxIdHRwXFJlcXVlc3Q7CgpkZWZpbmUoJ0xBUkFWRUxfU1RBUlQnLCBtaWNyb3RpbWUodHJ1ZSkpOwoKaWYgKGZpbGVfZXhpc3RzKCRtYWludGVuYW5jZSA9IF9fRElSX18uJy9zdG9yYWdlL2ZyYW1ld29yay9tYWludGVuYW5jZS5waHAnKSkgewogICAgcmVxdWlyZSAkbWFpbnRlbmFuY2U7Cn0KCnJlcXVpcmUgX19ESVJfXy4nL3ZlbmRvci9hdXRvbG9hZC5waHAnOwoKJGFwcCA9IHJlcXVpcmVfb25jZSBfX0RJUl9fLicvYm9vdHN0cmFwL2FwcC5waHAnOwoKJGFwcC0+aGFuZGxlUmVxdWVzdChSZXF1ZXN0OjpjYXB0dXJlKCkpOwo=' | base64 -d > '$DEPLOY_PATH/index.php'
             printf '%s' 'PElmTW9kdWxlIG1vZF9yZXdyaXRlLmM+CiAgICBSZXdyaXRlRW5naW5lIE9uCiAgICBSZXdyaXRlQ29uZCAle1JFUVVFU1RfRklMRU5BTUV9ICEtZAogICAgUmV3cml0ZUNvbmQgJXtSRVFVRVNUX0ZJTEVOQU1FfSAhLWYKICAgIFJld3JpdGVSdWxlIF4gaW5kZXgucGhwIFtMXQo8L0lmTW9kdWxlPgo=' | base64 -d > '$DEPLOY_PATH/.htaccess'
             chmod 644 '$DEPLOY_PATH/index.php' '$DEPLOY_PATH/.htaccess'
             test -f '$DEPLOY_PATH/artisan'
@@ -128,16 +128,13 @@ jobs:
         run: |
           response_file=$(mktemp)
           probe_file=$(mktemp)
-          probe_payload='PD9waHAgaGVhZGVyKCdDb250ZW50LVR5cGU6IGFwcGxpY2F0aW9uL2pzb24nKTsgZWNobyBqc29uX2VuY29kZShbJ3BocF92ZXJzaW9uJz0+UEhQX1ZFUlNJT04sJ3NhcGknPT5QSFBfU0FQSSwnc3FsaXRlJz0+ZXh0ZW5zaW9uX2xvYWRlZCgncGRvX3NxbGl0ZScpLCdvcGVuc3NsJz0+ZXh0ZW5zaW9uX2xvYWRlZCgnb3BlbnNzbCcpXSk7'
-          ssh -i ~/.ssh/used_deploy_key -p "$SERVER_PORT" "$SERVER_USER@$SERVER_HOST" "printf '%s' '$probe_payload' | base64 -d > '$DEPLOY_PATH/deploy-runtime-probe.php'"
-          probe_status=$(curl --silent --show-error --output "$probe_file" --write-out '%{http_code}' https://used.pm.sa/deploy-runtime-probe.php || true)
-          echo "Web PHP probe: HTTP $probe_status"
+          probe_status=$(curl --silent --show-error --output "$probe_file" --write-out '%{http_code}' --header 'X-Deploy-Runtime-Probe: used-runtime-v1' https://used.pm.sa/index.php || true)
+          echo "Web PHP probe through index.php: HTTP $probe_status"
           cat "$probe_file" || true
           echo
           if [ "$probe_status" != "200" ]; then
-            echo "Web PHP runtime probe was blocked or failed; API verification cannot distinguish Apache/PHP from Laravel."
+            echo "The domain PHP handler failed before Laravel started."
           fi
-          ssh -i ~/.ssh/used_deploy_key -p "$SERVER_PORT" "$SERVER_USER@$SERVER_HOST" "rm -f '$DEPLOY_PATH/deploy-runtime-probe.php'"
           status_code=$(curl --silent --show-error --location --retry 5 --retry-delay 5 --output "$response_file" --write-out '%{http_code}' https://used.pm.sa/api/health || true)
           if [ "$status_code" != "200" ]; then
             echo "API health check failed with HTTP $status_code."
