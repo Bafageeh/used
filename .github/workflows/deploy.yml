@@ -52,7 +52,11 @@ jobs:
           ssh -i ~/.ssh/used_deploy_key -p "$SERVER_PORT" "$SERVER_USER@$SERVER_HOST" "set -e
             tar -C '$DEPLOY_PATH' -xzf /tmp/used-backend.tgz
             rm -f /tmp/used-backend.tgz
-            test -f '$DEPLOY_PATH/artisan'"
+            printf '%s' 'PD9waHAKCnVzZSBJbGx1bWluYXRlXEh0dHBcUmVxdWVzdDsKCmRlZmluZSgnTEFSQVZFTF9TVEFSVCcsIG1pY3JvdGltZSh0cnVlKSk7CgppZiAoZmlsZV9leGlzdHMoJG1haW50ZW5hbmNlID0gX19ESVJfXy4nL3N0b3JhZ2UvZnJhbWV3b3JrL21haW50ZW5hbmNlLnBocCcpKSB7CiAgICByZXF1aXJlICRtYWludGVuYW5jZTsKfQoKcmVxdWlyZSBfX0RJUl9fLicvdmVuZG9yL2F1dG9sb2FkLnBocCc7CgokYXBwID0gcmVxdWlyZV9vbmNlIF9fRElSX18uJy9ib290c3RyYXAvYXBwLnBocCc7CgokYXBwLT5oYW5kbGVSZXF1ZXN0KFJlcXVlc3Q6OmNhcHR1cmUoKSk7Cg==' | base64 -d > '$DEPLOY_PATH/index.php'
+            printf '%s' 'PElmTW9kdWxlIG1vZF9yZXdyaXRlLmM+CiAgICBSZXdyaXRlRW5naW5lIE9uCgogICAgUmV3cml0ZVJ1bGUgKF58LylcLiAtIFtGLExdCgogICAgUmV3cml0ZUNvbmQgJXtSRVFVRVNUX1VSSX0gIV4vcHVibGljLwogICAgUmV3cml0ZUNvbmQgJXtET0NVTUVOVF9ST09UfS9wdWJsaWMle1JFUVVFU1RfVVJJfSAtZiBbT1JdCiAgICBSZXdyaXRlQ29uZCAle0RPQ1VNRU5UX1JPT1R9L3B1YmxpYyV7UkVRVUVTVF9VUkl9IC1kCiAgICBSZXdyaXRlUnVsZSBeKC4qKSQgcHVibGljLyQxIFtMXQoKICAgIFJld3JpdGVDb25kICV7UkVRVUVTVF9GSUxFTkFNRX0gIS1mCiAgICBSZXdyaXRlQ29uZCAle1JFUVVFU1RfRklMRU5BTUV9ICEtZAogICAgUmV3cml0ZVJ1bGUgXiBpbmRleC5waHAgW0xdCjwvSWZNb2R1bGU+Cgo8RmlsZXNNYXRjaCAiXihcLmVudnxhcnRpc2FufGNvbXBvc2VyXC4oanNvbnxsb2NrKXxwYWNrYWdlXC5qc29ufHBocHVuaXRcLnhtbCkkIj4KICAgIFJlcXVpcmUgYWxsIGRlbmllZAo8L0ZpbGVzTWF0Y2g+Cg==' | base64 -d > '$DEPLOY_PATH/.htaccess'
+            chmod 644 '$DEPLOY_PATH/index.php' '$DEPLOY_PATH/.htaccess'
+            test -f '$DEPLOY_PATH/artisan'
+            test -f '$DEPLOY_PATH/index.php'"
 
       - name: Configure database and migrate
         env:
