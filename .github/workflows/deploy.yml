@@ -66,12 +66,17 @@ jobs:
           SERVER_USER: ${{ secrets.SERVER_USER }}
           DEPLOY_PATH: ${{ secrets.DEPLOY_PATH }}
         run: |
-          # Some cPanel builds do not expose DomainInfo::single_domain_data to UAPI.
-          # Treat that lookup as optional so deployment can use the filesystem fallback below.
-          domain_json=$(ssh -i ~/.ssh/used_deploy_key -p "$SERVER_PORT" "$SERVER_USER@$SERVER_HOST" "/usr/local/cpanel/bin/uapi --output=json DomainInfo single_domain_data domain=used.pm.sa" 2>/dev/null || true)
+          # SSH may use an administrative account, while UAPI needs the cPanel account owner.
+          cpanel_user=$(printf '%s\n' "$DEPLOY_PATH" | awk -F/ '$2 == "home" && $3 != "" { print $3; exit }')
+          if [ -z "$cpanel_user" ]; then
+            echo "Unable to derive the cPanel account owner from DEPLOY_PATH."
+            exit 1
+          fi
+          echo "Resolved cPanel account owner: $cpanel_user"
+          domain_json=$(ssh -i ~/.ssh/used_deploy_key -p "$SERVER_PORT" "$SERVER_USER@$SERVER_HOST" "/usr/local/cpanel/bin/uapi --user='$cpanel_user' --output=json DomainInfo single_domain_data domain=used.pm.sa" 2>/dev/null || true)
           domain_root=$(printf '%s' "$domain_json" | jq -r '.result.data.documentroot // empty' 2>/dev/null || true)
           if [ -z "$domain_root" ] || [ "$domain_root" = "/" ]; then
-            domain_candidates=$(ssh -i ~/.ssh/used_deploy_key -p "$SERVER_PORT" "$SERVER_USER@$SERVER_HOST" 'find "$HOME" -maxdepth 5 -type d -name cgi-bin -printf "%h\n" 2>/dev/null | sort -u' || true)
+            domain_candidates=$(ssh -i ~/.ssh/used_deploy_key -p "$SERVER_PORT" "$SERVER_USER@$SERVER_HOST" "find '/home/$cpanel_user' -maxdepth 5 -type d -name cgi-bin -printf '%h\\n' 2>/dev/null | sort -u" || true)
             echo "Document root candidates discovered from cgi-bin:"
             printf '%s\n' "$domain_candidates"
             domain_root=$(printf '%s\n' "$domain_candidates" | awk '/\/used\.pm\.sa$/ { print; exit }')
