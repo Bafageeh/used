@@ -134,12 +134,18 @@ jobs:
               php artisan route:list --path=api/health || true
               echo 'Latest cPanel/PHP log files:'
               find ~/logs ~/access-logs '$DEPLOY_PATH' -maxdepth 3 -type f \\( -name '*error*' -o -name '*.log' \\) -mmin -15 -print 2>/dev/null | head -n 30 || true
-              echo 'LATEST LARAVEL ERROR HEADLINE:'
-              tac storage/logs/laravel.log 2>/dev/null | grep -m1 -E 'production\\.ERROR|local\\.ERROR|ERROR:' || true
-              echo 'LATEST WEB SERVER ERROR HEADLINES:'
-              for log_file in ~/logs/used.pm.sa*error* ~/logs/error_log ~/access-logs/used.pm.sa* '$DEPLOY_PATH'/error_log; do
-                [ -f \"\\$log_file\" ] && tail -n 8 \"\\$log_file\"
-              done
+              echo 'CURRENT LARAVEL ERRORS:'
+              if [ -f storage/logs/laravel.log ]; then
+                grep -E 'production\\.ERROR|local\\.ERROR|ERROR:' storage/logs/laravel.log | tail -n 5 || true
+              else
+                echo 'No Laravel log file found'
+              fi
+              echo 'DIRECT LARAVEL REQUEST:'
+              php -r 'require "vendor/autoload.php"; \\$app=require "bootstrap/app.php"; \\$response=\\$app->handleRequest(Illuminate\\\\Http\\\\Request::create("/api/health","GET"));' || true
+              echo 'CURRENT WEB SERVER ERRORS:'
+              find ~/logs ~/access-logs '$DEPLOY_PATH' -maxdepth 3 -type f \\( -name '*error*' -o -name 'error_log' \\) -mmin -10 -exec tail -n 12 {} \\; 2>/dev/null || true
+              echo 'PHP MODULES:'
+              php -m | grep -E 'PDO|sqlite|mbstring|openssl' || true
               echo 'END OF DIAGNOSTICS' "
             exit 1
           fi
