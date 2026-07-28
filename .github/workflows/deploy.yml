@@ -121,12 +121,26 @@ jobs:
           SERVER_USER: ${{ secrets.SERVER_USER }}
           DEPLOY_PATH: ${{ secrets.DEPLOY_PATH }}
         run: |
-          if ! curl --silent --show-error --fail --retry 5 --retry-delay 5 https://used.pm.sa/api/health; then
-            echo "API health check failed. Showing Laravel and web-server diagnostics."
+          response_file=$(mktemp)
+          status_code=$(curl --silent --show-error --location --retry 5 --retry-delay 5 --output "$response_file" --write-out '%{http_code}' https://used.pm.sa/api/health || true)
+          if [ "$status_code" != "200" ]; then
+            echo "API health check failed with HTTP $status_code."
+            echo "Response body (first 40 lines):"
+            sed -n '1,40p' "$response_file" || true
             ssh -i ~/.ssh/used_deploy_key -p "$SERVER_PORT" "$SERVER_USER@$SERVER_HOST" "cd '$DEPLOY_PATH'
+              echo 'Laravel environment:'
               php artisan about --only=environment || true
-              tail -n 120 storage/logs/laravel.log 2>/dev/null || true
-              tail -n 80 ~/logs/used.pm.sa.php.error.log 2>/dev/null || true
-              tail -n 80 ~/logs/error_log 2>/dev/null || true"
+              echo 'Route check:'
+              php artisan route:list --path=api/health || true
+              echo 'Latest cPanel/PHP log files:'
+              find ~/logs ~/access-logs '$DEPLOY_PATH' -maxdepth 3 -type f \\( -name '*error*' -o -name '*.log' \\) -mmin -15 -print 2>/dev/null | head -n 30 || true
+              echo 'LATEST LARAVEL ERROR HEADLINE:'
+              tac storage/logs/laravel.log 2>/dev/null | grep -m1 -E 'production\\.ERROR|local\\.ERROR|ERROR:' || true
+              echo 'LATEST WEB SERVER ERROR HEADLINES:'
+              for log_file in ~/logs/used.pm.sa*error* ~/logs/error_log ~/access-logs/used.pm.sa* '$DEPLOY_PATH'/error_log; do
+                [ -f \"\\$log_file\" ] && tail -n 8 \"\\$log_file\"
+              done
+              echo 'END OF DIAGNOSTICS' "
             exit 1
           fi
+          cat "$response_file"
