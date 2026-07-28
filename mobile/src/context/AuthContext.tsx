@@ -18,12 +18,12 @@ export function AuthProvider({ children }: PropsWithChildren) {
   const [loading, setLoading] = useState(true);
 
   const refresh = async () => {
-    const token = await SecureStore.getItemAsync('auth_token');
-    if (!token) return setUser(null);
     try {
+      const token = await SecureStore.getItemAsync('auth_token');
+      if (!token) return setUser(null);
       setUser(await api<User>('/me'));
     } catch {
-      await SecureStore.deleteItemAsync('auth_token');
+      await SecureStore.deleteItemAsync('auth_token').catch(() => undefined);
       setUser(null);
     }
   };

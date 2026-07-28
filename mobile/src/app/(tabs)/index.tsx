@@ -21,8 +21,8 @@ export default function HomeScreen() {
         api<Category[]>('/categories'),
         api<Paginated<Listing>>(`/listings${categoryId ? `?category_id=${categoryId}` : ''}`),
       ]);
-      setCategories(cats);
-      setListings(result.data);
+      setCategories(Array.isArray(cats) ? cats : []);
+      setListings(Array.isArray(result?.data) ? result.data : []);
     } catch (e) { setError(getErrorMessage(e)); }
     finally { setLoading(false); }
   }, [categoryId]);
