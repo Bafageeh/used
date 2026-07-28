@@ -128,13 +128,16 @@ jobs:
         run: |
           response_file=$(mktemp)
           probe_file=$(mktemp)
-          probe_payload='PD9waHAgbmVhZGVyKCdDb250ZW50LVR5cGU6IGFwcGxpY2F0aW9uL2pzb24nKTsgZWNobyBqc29uX2VuY29kZShbJ3BocF92ZXJzaW9uJz0+UEhQX1ZFUlNJT04sJ3NhcGknPT5QSFBfU0FQSSwnc3FsaXRlJz0+ZXh0ZW5zaW9uX2xvYWRlZCgncGRvX3NxbGl0ZScpLCdvcGVuc3NsJz0+ZXh0ZW5zaW9uX2xvYWRlZCgnb3BlbnNzbCcpXSk7'
-          ssh -i ~/.ssh/used_deploy_key -p "$SERVER_PORT" "$SERVER_USER@$SERVER_HOST" "printf '%s' '$probe_payload' | base64 -d > '$DEPLOY_PATH/__deploy_probe.php'"
-          probe_status=$(curl --silent --show-error --output "$probe_file" --write-out '%{http_code}' https://used.pm.sa/__deploy_probe.php || true)
+          probe_payload='PD9waHAgaGVhZGVyKCdDb250ZW50LVR5cGU6IGFwcGxpY2F0aW9uL2pzb24nKTsgZWNobyBqc29uX2VuY29kZShbJ3BocF92ZXJzaW9uJz0+UEhQX1ZFUlNJT04sJ3NhcGknPT5QSFBfU0FQSSwnc3FsaXRlJz0+ZXh0ZW5zaW9uX2xvYWRlZCgncGRvX3NxbGl0ZScpLCdvcGVuc3NsJz0+ZXh0ZW5zaW9uX2xvYWRlZCgnb3BlbnNzbCcpXSk7'
+          ssh -i ~/.ssh/used_deploy_key -p "$SERVER_PORT" "$SERVER_USER@$SERVER_HOST" "printf '%s' '$probe_payload' | base64 -d > '$DEPLOY_PATH/deploy-runtime-probe.php'"
+          probe_status=$(curl --silent --show-error --output "$probe_file" --write-out '%{http_code}' https://used.pm.sa/deploy-runtime-probe.php || true)
           echo "Web PHP probe: HTTP $probe_status"
           cat "$probe_file" || true
           echo
-          ssh -i ~/.ssh/used_deploy_key -p "$SERVER_PORT" "$SERVER_USER@$SERVER_HOST" "rm -f '$DEPLOY_PATH/__deploy_probe.php'"
+          if [ "$probe_status" != "200" ]; then
+            echo "Web PHP runtime probe was blocked or failed; API verification cannot distinguish Apache/PHP from Laravel."
+          fi
+          ssh -i ~/.ssh/used_deploy_key -p "$SERVER_PORT" "$SERVER_USER@$SERVER_HOST" "rm -f '$DEPLOY_PATH/deploy-runtime-probe.php'"
           status_code=$(curl --silent --show-error --location --retry 5 --retry-delay 5 --output "$response_file" --write-out '%{http_code}' https://used.pm.sa/api/health || true)
           if [ "$status_code" != "200" ]; then
             echo "API health check failed with HTTP $status_code."
