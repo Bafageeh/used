@@ -95,6 +95,9 @@ jobs:
             fi
             mv -f \"\$clean_env\" .env
 
+            mkdir -p storage/framework/cache/data storage/framework/sessions storage/framework/views storage/logs bootstrap/cache
+            find storage bootstrap/cache database -type d -exec chmod 775 {} \;
+            find storage bootstrap/cache database -type f -exec chmod 664 {} \;
             php artisan optimize:clear
             if ! grep -q '^APP_KEY=base64:' .env; then php artisan key:generate --force; fi
             php artisan migrate --force
