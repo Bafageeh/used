@@ -58,6 +58,31 @@ jobs:
             test -f '$DEPLOY_PATH/artisan'
             test -f '$DEPLOY_PATH/index.php'"
 
+
+      - name: Publish domain document root
+        env:
+          SERVER_HOST: ${{ secrets.SERVER_HOST }}
+          SERVER_PORT: ${{ secrets.SERVER_PORT }}
+          SERVER_USER: ${{ secrets.SERVER_USER }}
+          DEPLOY_PATH: ${{ secrets.DEPLOY_PATH }}
+        run: |
+          domain_json=$(ssh -i ~/.ssh/used_deploy_key -p "$SERVER_PORT" "$SERVER_USER@$SERVER_HOST" "uapi --output=json DomainInfo single_domain_data domain=used.pm.sa")
+          domain_root=$(printf '%s' "$domain_json" | jq -r '.result.data.documentroot // empty')
+          if [ -z "$domain_root" ] || [ "$domain_root" = "/" ]; then
+            echo "Unable to resolve the cPanel document root for used.pm.sa"
+            printf '%s\n' "$domain_json"
+            exit 1
+          fi
+          echo "Resolved used.pm.sa document root: $domain_root"
+          ssh -i ~/.ssh/used_deploy_key -p "$SERVER_PORT" "$SERVER_USER@$SERVER_HOST" "set -e
+            test -f '$DEPLOY_PATH/public/index.php'
+            mkdir -p '$domain_root'
+            printf '%s' 'PD9waHAKCmlmIChpc3NldCgkX0dFVFsnZGVwbG95X3J1bnRpbWVfcHJvYmUnXSkgJiYgaGFzaF9lcXVhbHMoJ3VzZWQtcnVudGltZS12MycsIChzdHJpbmcpICRfR0VUWydkZXBsb3lfcnVudGltZV9wcm9iZSddKSkgewogICAgaGVhZGVyKCdDb250ZW50LVR5cGU6IGFwcGxpY2F0aW9uL2pzb24nKTsKICAgIGVjaG8ganNvbl9lbmNvZGUoWwogICAgICAgICdwaHBfdmVyc2lvbicgPT4gUEhQX1ZFUlNJT04sCiAgICAgICAgJ3NhcGknID0+IFBIUF9TQVBJLAogICAgICAgICdwZG9fc3FsaXRlJyA9PiBleHRlbnNpb25fbG9hZGVkKCdwZG9fc3FsaXRlJyksCiAgICAgICAgJ29wZW5zc2wnID0+IGV4dGVuc2lvbl9sb2FkZWQoJ29wZW5zc2wnKSwKICAgIF0pOwogICAgZXhpdDsKfQoKcmVxdWlyZSAnX19VU0VEX0FQUF9QVUJMSUNfSU5ERVhfXyc7Cg==' | base64 -d > '$domain_root/index.php'
+            sed -i 's|__USED_APP_PUBLIC_INDEX__|$DEPLOY_PATH/public/index.php|' '$domain_root/index.php'
+            printf '%s' 'PElmTW9kdWxlIG1vZF9yZXdyaXRlLmM+CiAgICBSZXdyaXRlRW5naW5lIE9uCiAgICBSZXdyaXRlQ29uZCAle1JFUVVFU1RfRklMRU5BTUV9ICEtZAogICAgUmV3cml0ZUNvbmQgJXtSRVFVRVNUX0ZJTEVOQU1FfSAhLWYKICAgIFJld3JpdGVSdWxlIF4gaW5kZXgucGhwIFtMXQo8L0lmTW9kdWxlPgo=' | base64 -d > '$domain_root/.htaccess'
+            chmod 644 '$domain_root/index.php' '$domain_root/.htaccess'
+            test -s '$domain_root/index.php'"
+
       - name: Configure database and migrate
         env:
           SERVER_HOST: ${{ secrets.SERVER_HOST }}
@@ -128,7 +153,7 @@ jobs:
         run: |
           response_file=$(mktemp)
           probe_file=$(mktemp)
-          probe_status=$(curl --silent --show-error --output "$probe_file" --write-out '%{http_code}' 'https://used.pm.sa/index.php?deploy_runtime_probe=used-runtime-v2' || true)
+          probe_status=$(curl --silent --show-error --output "$probe_file" --write-out '%{http_code}' 'https://used.pm.sa/index.php?deploy_runtime_probe=used-runtime-v3' || true)
           echo "Web PHP probe through index.php: HTTP $probe_status"
           cat "$probe_file" || true
           echo
