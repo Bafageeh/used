@@ -9,6 +9,7 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
+    "@expo/metro-runtime": "^57.0.7",
     "@expo/vector-icons": "15.1.1",
     "expo": "57.0.8",
     "expo-constants": "57.0.7",
