@@ -1,29 +1,40 @@
-import { Stack } from 'expo-router';
-import { StatusBar } from 'expo-status-bar';
-import { SafeAreaProvider } from 'react-native-safe-area-context';
-import { AuthProvider } from '@/context/AuthContext';
-import { AppErrorBoundary } from '@/components/AppErrorBoundary';
-import { colors } from '@/theme';
+import { StyleSheet, Text, View } from 'react-native';
 
 export default function RootLayout() {
   return (
-    <AppErrorBoundary>
-      <SafeAreaProvider>
-        <AuthProvider>
-          <StatusBar style="dark" />
-          <Stack screenOptions={{
-            headerTitleAlign: 'center',
-            headerTintColor: colors.primary,
-            headerStyle: { backgroundColor: colors.card },
-            contentStyle: { backgroundColor: colors.background },
-          }}>
-            <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
-            <Stack.Screen name="auth" options={{ title: 'الدخول والتسجيل', presentation: 'modal' }} />
-            <Stack.Screen name="listing/[id]" options={{ title: 'تفاصيل الإعلان' }} />
-            <Stack.Screen name="create-listing" options={{ title: 'إضافة إعلان' }} />
-          </Stack>
-        </AuthProvider>
-      </SafeAreaProvider>
-    </AppErrorBoundary>
+    <View style={styles.root}>
+      <Text style={styles.title}>مستعمل مجاني</Text>
+      <Text style={styles.message}>تم تشغيل التطبيق بنجاح</Text>
+      <Text style={styles.note}>شاشة فحص مؤقتة لتحديد سبب الإغلاق</Text>
+    </View>
   );
 }
+
+const styles = StyleSheet.create({
+  root: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: 24,
+    backgroundColor: '#F4F7F6',
+  },
+  title: {
+    color: '#0F766E',
+    fontSize: 28,
+    fontWeight: '900',
+    textAlign: 'center',
+  },
+  message: {
+    marginTop: 14,
+    color: '#17201E',
+    fontSize: 18,
+    fontWeight: '800',
+    textAlign: 'center',
+  },
+  note: {
+    marginTop: 8,
+    color: '#64706D',
+    fontSize: 14,
+    textAlign: 'center',
+  },
+});
