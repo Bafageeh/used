@@ -3,15 +3,17 @@ import { Ionicons } from '@expo/vector-icons';
 import { colors } from '@/theme';
 
 export default function TabsLayout() {
-  return <Tabs screenOptions={{
-    headerTitleAlign: 'center',
-    headerStyle: { backgroundColor: colors.card },
-    headerTintColor: colors.primary,
-    tabBarActiveTintColor: colors.primary,
-    tabBarInactiveTintColor: colors.muted,
-    tabBarStyle: { height: 66, paddingTop: 7, paddingBottom: 8 },
-    tabBarLabelStyle: { fontSize: 12, fontWeight: '700' },
-  }}>
+  return <Tabs
+    detachInactiveScreens={false}
+    screenOptions={{
+      headerTitleAlign: 'center',
+      headerStyle: { backgroundColor: colors.card },
+      headerTintColor: colors.primary,
+      tabBarActiveTintColor: colors.primary,
+      tabBarInactiveTintColor: colors.muted,
+      tabBarStyle: { height: 66, paddingTop: 7, paddingBottom: 8 },
+      tabBarLabelStyle: { fontSize: 12, fontWeight: '700' },
+    }}>
     <Tabs.Screen name="index" options={{
       title: 'الرئيسية',
       headerTitle: 'مستعمل مجاني',
