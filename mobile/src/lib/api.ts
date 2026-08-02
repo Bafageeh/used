@@ -1,4 +1,5 @@
 import Constants from 'expo-constants';
+import { fetch } from 'expo/fetch';
 import * as SecureStore from 'expo-secure-store';
 
 const API_URL = Constants.expoConfig?.extra?.apiUrl ?? 'https://used.pm.sa/api';
