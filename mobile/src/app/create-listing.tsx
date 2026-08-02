@@ -2,10 +2,9 @@ import { useEffect, useState } from 'react';
 import { Alert, KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, Switch, Text, TextInput, View } from 'react-native';
 import * as ImagePicker from 'expo-image-picker';
 import * as Location from 'expo-location';
-import { File } from 'expo-file-system';
 import { Image } from 'expo-image';
 import { router } from 'expo-router';
-import { api, getErrorMessage } from '@/lib/api';
+import { api, getErrorMessage, uploadListingImage } from '@/lib/api';
 import type { Category, Listing } from '@/types';
 import { colors } from '@/theme';
 
@@ -76,13 +75,8 @@ export default function CreateListingScreen() {
         category_id: categoryId, title, description, price: price || null, city,
         latitude: coords?.latitude, longitude: coords?.longitude, show_phone: showPhone, status: 'published',
       }) });
-      if (images.length) {
-        const form = new FormData();
-        images.forEach(image => {
-          const file = new File(image.uri);
-          form.append('images[]', file);
-        });
-        await api(`/listings/${listing.id}/images`, { method: 'POST', body: form });
+      for (const image of images) {
+        await uploadListingImage(listing.id, image.uri, image.mimeType);
       }
       Alert.alert('تم بنجاح', 'نُشر إعلانك.', [{ text: 'عرض الإعلان', onPress: () => router.replace(`/listing/${listing.id}`) }]);
     } catch (e) { Alert.alert('تعذر النشر', getErrorMessage(e)); } finally { setBusy(false); }
