@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { Alert, KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, Switch, Text, TextInput, View } from 'react-native';
 import * as ImagePicker from 'expo-image-picker';
 import * as Location from 'expo-location';
+import { File } from 'expo-file-system';
 import { Image } from 'expo-image';
 import { router } from 'expo-router';
 import { api, getErrorMessage } from '@/lib/api';
@@ -41,7 +42,10 @@ export default function CreateListingScreen() {
       }) });
       if (images.length) {
         const form = new FormData();
-        images.forEach((image, index) => form.append('images[]', { uri: image.uri, name: image.fileName ?? `image-${index}.jpg`, type: image.mimeType ?? 'image/jpeg' } as any));
+        images.forEach(image => {
+          const file = new File(image.uri);
+          form.append('images[]', file, image.fileName ?? file.name);
+        });
         await api(`/listings/${listing.id}/images`, { method: 'POST', body: form });
       }
       Alert.alert('تم بنجاح', 'نُشر إعلانك.', [{ text: 'عرض الإعلان', onPress: () => router.replace(`/listing/${listing.id}`) }]);
