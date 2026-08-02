@@ -23,17 +23,53 @@ export default function CreateListingScreen() {
   useEffect(() => { api<Category[]>('/categories').then(setCategories); }, []);
 
   const chooseImages = async () => {
-    const result = await ImagePicker.launchImageLibraryAsync({ mediaTypes: ['images'], allowsMultipleSelection: true, selectionLimit: 8, quality: .8 });
-    if (!result.canceled) setImages(result.assets.slice(0, 8));
+    const remainingSlots = 8 - images.length;
+    if (remainingSlots <= 0) return Alert.alert('الصور', 'يمكن إضافة 8 صور كحد أقصى.');
+
+    const result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ['images'],
+      allowsMultipleSelection: true,
+      selectionLimit: remainingSlots,
+      quality: .8,
+    });
+    if (result.canceled) return;
+
+    setImages(current => {
+      const seen = new Set<string>();
+      return [...current, ...result.assets].filter(image => {
+        const key = image.assetId ?? image.uri;
+        if (seen.has(key)) return false;
+        seen.add(key);
+        return true;
+      }).slice(0, 8);
+    });
   };
   const locate = async () => {
     const permission = await Location.requestForegroundPermissionsAsync();
     if (!permission.granted) return Alert.alert('الموقع', 'يرجى السماح بالوصول إلى الموقع.');
-    const current = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Balanced });
-    setCoords(current.coords);
+
+    try {
+      const current = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Balanced });
+      setCoords(current.coords);
+
+      const [address] = await Location.reverseGeocodeAsync({
+        latitude: current.coords.latitude,
+        longitude: current.coords.longitude,
+      });
+      const detectedCity = address?.city || address?.district || address?.subregion || address?.region;
+      if (detectedCity) setCity(currentCity => currentCity.trim() || detectedCity);
+    } catch {
+      Alert.alert('الموقع', 'تعذر تحديد الموقع حاليًا. حاول مرة أخرى أو أدخل المدينة يدويًا.');
+    }
   };
   const submit = async () => {
-    if (!categoryId || !title.trim() || !description.trim() || !city.trim()) return Alert.alert('بيانات ناقصة', 'أكمل التصنيف والعنوان والوصف والمدينة.');
+    const missingFields = [
+      !categoryId && 'التصنيف',
+      !title.trim() && 'عنوان الإعلان',
+      !description.trim() && 'الوصف',
+      !city.trim() && 'المدينة',
+    ].filter(Boolean);
+    if (missingFields.length) return Alert.alert('بيانات ناقصة', 'أكمل الحقول التالية: ' + missingFields.join('، '));
     setBusy(true);
     try {
       const listing = await api<Listing>('/listings', { method: 'POST', body: JSON.stringify({
@@ -55,10 +91,15 @@ export default function CreateListingScreen() {
   return <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
     <ScrollView style={styles.root} contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
       <Text style={styles.label}>صور الإعلان ({images.length}/8)</Text>
-      <ScrollView horizontal contentContainerStyle={styles.images}>
+      <View style={styles.images}>
         <Pressable style={styles.addImage} onPress={chooseImages}><Text style={styles.addImageText}>+ إضافة صور</Text></Pressable>
-        {images.map(image => <Image key={image.uri} source={image.uri} style={styles.thumb} />)}
-      </ScrollView>
+        {images.map((image, index) => <View key={image.assetId ?? image.uri} style={styles.thumbWrap}>
+          <Image source={image.uri} style={styles.thumb} />
+          <Pressable accessibilityLabel="حذف الصورة" style={styles.removeImage} onPress={() => setImages(current => current.filter((_, itemIndex) => itemIndex !== index))}>
+            <Text style={styles.removeImageText}>×</Text>
+          </Pressable>
+        </View>)}
+      </View>
       <Text style={styles.label}>التصنيف</Text>
       <ScrollView horizontal contentContainerStyle={styles.categories}>
         {categories.map(category => <Pressable key={category.id} onPress={() => setCategoryId(category.id)} style={[styles.chip, categoryId === category.id && styles.chipActive]}><Text style={categoryId === category.id ? styles.chipActiveText : styles.chipText}>{category.name}</Text></Pressable>)}
@@ -78,10 +119,13 @@ const styles = StyleSheet.create({
   root: { flex: 1, backgroundColor: colors.background },
   content: { padding: 16, paddingBottom: 40 },
   label: { color: colors.text, fontWeight: '800', textAlign: 'right', marginBottom: 9, marginTop: 5 },
-  images: { gap: 9, marginBottom: 17 },
-  addImage: { width: 110, height: 90, borderWidth: 1, borderStyle: 'dashed', borderColor: colors.primary, borderRadius: 13, alignItems: 'center', justifyContent: 'center' },
-  addImageText: { color: colors.primary, fontWeight: '700' },
+  images: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'flex-end', gap: 9, marginBottom: 17 },
+  addImage: { width: 90, height: 90, borderWidth: 1, borderStyle: 'dashed', borderColor: colors.primary, borderRadius: 13, alignItems: 'center', justifyContent: 'center' },
+  addImageText: { color: colors.primary, fontWeight: '700', textAlign: 'center' },
+  thumbWrap: { width: 90, height: 90, position: 'relative' },
   thumb: { width: 90, height: 90, borderRadius: 13 },
+  removeImage: { position: 'absolute', top: 4, left: 4, width: 24, height: 24, borderRadius: 12, backgroundColor: 'rgba(0,0,0,.65)', alignItems: 'center', justifyContent: 'center' },
+  removeImageText: { color: '#fff', fontSize: 20, fontWeight: '800', lineHeight: 21 },
   categories: { gap: 8, marginBottom: 14 },
   chip: { borderWidth: 1, borderColor: colors.border, backgroundColor: '#fff', paddingHorizontal: 13, paddingVertical: 10, borderRadius: 20 },
   chipActive: { backgroundColor: colors.primary, borderColor: colors.primary },
