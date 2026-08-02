@@ -44,7 +44,7 @@ export default function CreateListingScreen() {
         const form = new FormData();
         images.forEach(image => {
           const file = new File(image.uri);
-          form.append('images[]', file, image.fileName ?? file.name);
+          form.append('images[]', file);
         });
         await api(`/listings/${listing.id}/images`, { method: 'POST', body: form });
       }
