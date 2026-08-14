@@ -18,5 +18,5 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          echo "Dispatching latest main with marketplace chat and notifications"
+          echo "Dispatching latest main with compact listing detail summary"
           gh workflow run start-expo.yml --repo Bafageeh/used --ref main
