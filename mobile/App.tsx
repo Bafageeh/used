@@ -27,6 +27,7 @@ type Listing = {
   id: number;
   title: string;
   description?: string;
+  item_condition?: ItemCondition;
   price: string | number | null;
   city: string;
   category_id?: number;
@@ -44,6 +45,7 @@ type Listing = {
 type Paginated<T> = { data: T[] };
 type Screen = 'home' | 'favorites' | 'add' | 'notifications' | 'messages' | 'mine' | 'account' | 'admin';
 type ViewMode = 'list' | 'grid';
+type ItemCondition = 'new_good' | 'new_defect' | 'used_good' | 'used_defect';
 
 type Coordinates = { latitude: number; longitude: number };
 
@@ -56,6 +58,17 @@ const TEXT = '#18181B';
 const MUTED = '#71717A';
 const BORDER = '#E7E2EF';
 const SURFACE = '#F8F7FA';
+
+const ITEM_CONDITIONS: { key: ItemCondition; label: string; icon: any }[] = [
+  { key: 'new_good', label: 'جديدة سليمة', icon: 'sparkles-outline' },
+  { key: 'new_defect', label: 'جديدة بها عيب', icon: 'alert-circle-outline' },
+  { key: 'used_good', label: 'مستعملة سليمة', icon: 'checkmark-circle-outline' },
+  { key: 'used_defect', label: 'مستعملة بها عيب', icon: 'warning-outline' },
+];
+
+function itemConditionLabel(value?: ItemCondition) {
+  return ITEM_CONDITIONS.find((item) => item.key === value)?.label || 'مستعملة سليمة';
+}
 
 
 const REGION_OPTIONS = [
@@ -256,6 +269,41 @@ function CategoryDropdown({ categories, value, onChange }: { categories: Categor
   );
 }
 
+function ItemConditionDropdown({ value, onChange }: { value?: ItemCondition; onChange: (value: ItemCondition) => void }) {
+  const [open, setOpen] = useState(false);
+  const selected = ITEM_CONDITIONS.find((item) => item.key === value);
+
+  return (
+    <View style={styles.categoryDropdownWrap}>
+      <Text style={styles.formLabel}>حالة السلعة</Text>
+      <Pressable style={[styles.categoryDropdownButton, open && styles.categoryDropdownButtonOpen]} onPress={() => setOpen((current) => !current)}>
+        <Ionicons name={open ? 'chevron-up' : 'chevron-down'} size={20} color={PURPLE} />
+        <View style={styles.categoryDropdownValue}>
+          {selected ? <Ionicons name={selected.icon} size={20} color={PURPLE} /> : null}
+          <Text style={[styles.categoryDropdownText, !selected && styles.categoryDropdownPlaceholder]}>{selected?.label || 'اختر حالة السلعة'}</Text>
+        </View>
+      </Pressable>
+      {open ? (
+        <View style={styles.categoryDropdownMenu}>
+          {ITEM_CONDITIONS.map((option, index) => {
+            const active = option.key === value;
+            return (
+              <Pressable
+                key={option.key}
+                style={[styles.categoryDropdownOption, index < ITEM_CONDITIONS.length - 1 && styles.categoryDropdownOptionBorder, active && styles.categoryDropdownOptionActive]}
+                onPress={() => { onChange(option.key); setOpen(false); }}
+              >
+                <Ionicons name={active ? 'checkmark-circle' : option.icon} size={20} color={active ? PURPLE : '#6B6572'} />
+                <Text style={[styles.categoryDropdownOptionText, active && styles.categoryDropdownOptionTextActive]}>{option.label}</Text>
+              </Pressable>
+            );
+          })}
+        </View>
+      ) : null}
+    </View>
+  );
+}
+
 function ListingCard({
   item,
   onPress,
@@ -370,6 +418,7 @@ function CreateListing({ categories, token, onPublished }: { categories: Categor
   const [categoryId, setCategoryId] = useState<number>();
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
+  const [itemCondition, setItemCondition] = useState<ItemCondition>();
   const [city, setCity] = useState('');
   const [showPhone, setShowPhone] = useState(true);
   const [images, setImages] = useState<ImagePicker.ImagePickerAsset[]>([]);
@@ -434,8 +483,8 @@ function CreateListing({ categories, token, onPublished }: { categories: Categor
   };
 
   const submit = async () => {
-    if (!categoryId || !title.trim() || !description.trim() || !city.trim()) {
-      return Alert.alert('بيانات ناقصة', 'أكمل التصنيف والعنوان والوصف والمدينة.');
+    if (!categoryId || !itemCondition || !title.trim() || !description.trim() || !city.trim()) {
+      return Alert.alert('بيانات ناقصة', 'أكمل التصنيف وحالة السلعة والعنوان والوصف والمدينة.');
     }
     if (!images.length) return Alert.alert('الصور', 'أضف صورة واحدة على الأقل للإعلان.');
     setBusy(true);
@@ -446,6 +495,7 @@ function CreateListing({ categories, token, onPublished }: { categories: Categor
           category_id: categoryId,
           title: title.trim(),
           description: description.trim(),
+          item_condition: itemCondition,
           city: city.trim(),
           latitude: coords?.latitude ?? null,
           longitude: coords?.longitude ?? null,
@@ -519,6 +569,7 @@ function CreateListing({ categories, token, onPublished }: { categories: Categor
       </View>
 
       <CategoryDropdown categories={categories} value={categoryId} onChange={setCategoryId} />
+      <ItemConditionDropdown value={itemCondition} onChange={setItemCondition} />
 
       <TextInput style={styles.input} value={title} onChangeText={setTitle} placeholder="عنوان الإعلان" textAlign="right" />
       <TextInput style={[styles.input, styles.textarea]} value={description} onChangeText={setDescription} placeholder="اكتب وصف السلعة وحالتها بالتفصيل..." multiline textAlignVertical="top" textAlign="right" />
@@ -558,6 +609,7 @@ function EditListing({
   const [categoryId, setCategoryId] = useState<number>(listing.category?.id || listing.category_id || 0);
   const [title, setTitle] = useState(listing.title || '');
   const [description, setDescription] = useState(listing.description || '');
+  const [itemCondition, setItemCondition] = useState<ItemCondition>(listing.item_condition || 'used_good');
   const [city, setCity] = useState(listing.city || '');
   const [showPhone, setShowPhone] = useState(listing.show_phone !== false);
   const [status, setStatus] = useState<'published' | 'sold' | 'archived'>(listing.status === 'sold' || listing.status === 'archived' ? listing.status : 'published');
@@ -652,6 +704,7 @@ function EditListing({
           category_id: categoryId,
           title: title.trim(),
           description: description.trim(),
+          item_condition: itemCondition,
           city: city.trim(),
           latitude: coords?.latitude ?? null,
           longitude: coords?.longitude ?? null,
@@ -728,6 +781,7 @@ function EditListing({
       </View>
 
       <CategoryDropdown categories={categories} value={categoryId} onChange={setCategoryId} />
+      <ItemConditionDropdown value={itemCondition} onChange={setItemCondition} />
 
       <Text style={styles.formLabel}>حالة الإعلان</Text>
       <View style={styles.statusChoiceRow}>
@@ -1132,6 +1186,10 @@ export default function App() {
           <View style={styles.detailBody}>
             <Text style={styles.detailTitle}>{detail.title}</Text>
             <Text style={styles.detailPrice}>مجانا</Text>
+            <View style={{ alignSelf: 'flex-end', flexDirection: 'row-reverse', alignItems: 'center', gap: 6, backgroundColor: PURPLE_LIGHT, borderRadius: 12, paddingHorizontal: 11, paddingVertical: 7, marginBottom: 10 }}>
+              <Ionicons name={ITEM_CONDITIONS.find((x) => x.key === detail.item_condition)?.icon || 'checkmark-circle-outline'} size={17} color={PURPLE} />
+              <Text style={{ color: PURPLE_DARK, fontWeight: '900', fontSize: 12 }}>{itemConditionLabel(detail.item_condition)}</Text>
+            </View>
             <View style={styles.detailMetaLine}><Text style={styles.detailMetaText}>{detail.city}</Text><Ionicons name="location-outline" size={19} color={PURPLE} /></View>
             <View style={styles.detailSeparator} />
             <Text style={styles.detailSectionTitle}>الوصف</Text>
