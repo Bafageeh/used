@@ -1,0 +1,91 @@
+name: Build Used APK Locally
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - ".github/workflows/build-apk-local.yml"
+
+permissions:
+  contents: write
+
+jobs:
+  build-apk:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22.13.1'
+
+      - name: Setup Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Setup Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Install dependencies
+        working-directory: mobile
+        run: |
+          rm -f package-lock.json
+          npm install
+
+      - name: Generate native Android project
+        working-directory: mobile
+        env:
+          CI: '1'
+        run: npx expo prebuild --platform android --clean --no-install
+
+      - name: Build installable APK
+        id: apk
+        working-directory: mobile/android
+        run: |
+          chmod +x gradlew
+          set +e
+          ./gradlew assembleRelease --no-daemon
+          RELEASE_STATUS=$?
+          set -e
+          if [ "$RELEASE_STATUS" = "0" ] && [ -f app/build/outputs/apk/release/app-release.apk ]; then
+            cp app/build/outputs/apk/release/app-release.apk /tmp/used-free.apk
+            echo "variant=release" >> "$GITHUB_OUTPUT"
+          else
+            echo "Release build unavailable; building debug APK instead."
+            ./gradlew assembleDebug --no-daemon
+            cp app/build/outputs/apk/debug/app-debug.apk /tmp/used-free.apk
+            echo "variant=debug" >> "$GITHUB_OUTPUT"
+          fi
+          ls -lh /tmp/used-free.apk
+
+      - name: Upload APK artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: used-free-apk
+          path: /tmp/used-free.apk
+          if-no-files-found: error
+          retention-days: 30
+
+      - name: Publish stable APK download
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          TAG="used-latest-apk"
+          if gh release view "$TAG" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            gh release upload "$TAG" /tmp/used-free.apk --repo "$GITHUB_REPOSITORY" --clobber
+          else
+            gh release create "$TAG" /tmp/used-free.apk \
+              --repo "$GITHUB_REPOSITORY" \
+              --target "$GITHUB_SHA" \
+              --title "مستعمل مجاني APK" \
+              --notes "APK مبني محليًا عبر GitHub Actions بدون استخدام EAS Build."
+          fi
+          echo "APK_VARIANT=${{ steps.apk.outputs.variant }}"
+          echo "APK_URL=https://github.com/$GITHUB_REPOSITORY/releases/download/$TAG/used-free.apk"
