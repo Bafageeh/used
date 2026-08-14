@@ -34,6 +34,7 @@ jobs:
           API_PATH='${{ secrets.DEPLOY_PATH }}/api'
           cd "$API_PATH"
           mkdir -p storage/logs storage/rembg-models
+          test -f "$API_PATH/bin/rembg_service.py"
 
           PY=''
           for candidate in python3.13 python3.12 python3.11 python3; do
@@ -57,30 +58,33 @@ jobs:
             fi
           fi
           "$VENV/bin/python" -m pip install --upgrade pip wheel setuptools
-          "$VENV/bin/pip" install 'rembg[cpu,cli]==2.0.75'
+          "$VENV/bin/pip" install 'rembg[cpu,cli]==2.0.75' fastapi uvicorn python-multipart pillow
 
           if [ -f storage/rembg.pid ]; then
             oldpid=$(cat storage/rembg.pid 2>/dev/null || true)
             [ -z "${oldpid:-}" ] || kill "$oldpid" 2>/dev/null || true
           fi
           pkill -f 'rembg s.*127.0.0.1.*8092' 2>/dev/null || true
+          pkill -f 'uvicorn rembg_service:app.*8092' 2>/dev/null || true
           sleep 1
-          nohup env U2NET_HOME="$API_PATH/storage/rembg-models" OMP_NUM_THREADS=2 "$VENV/bin/rembg" s --host 127.0.0.1 --port 8092 --no-ui > "$API_PATH/storage/logs/rembg.log" 2>&1 < /dev/null &
+          nohup env U2NET_HOME="$API_PATH/storage/rembg-models" OMP_NUM_THREADS=2 \
+            "$VENV/bin/python" -m uvicorn rembg_service:app --app-dir "$API_PATH/bin" --host 127.0.0.1 --port 8092 \
+            > "$API_PATH/storage/logs/rembg.log" 2>&1 < /dev/null &
           echo $! > storage/rembg.pid
 
           for i in $(seq 1 30); do
             sleep 2
             if curl -fsS --max-time 3 http://127.0.0.1:8092/api >/dev/null 2>&1; then
-              echo 'REMBG_HTTP=READY'
+              echo 'REMBG_TIGHT_CROP=READY'
               break
             fi
             if ! kill -0 "$(cat storage/rembg.pid)" 2>/dev/null; then
-              echo 'rembg process exited'
+              echo 'rembg tight-crop process exited'
               tail -n 120 storage/logs/rembg.log || true
               exit 3
             fi
             if [ "$i" = 30 ]; then
-              echo 'rembg service did not become ready'
+              echo 'rembg tight-crop service did not become ready'
               tail -n 120 storage/logs/rembg.log || true
               exit 4
             fi
@@ -89,11 +93,13 @@ jobs:
           SAMPLE=$(find storage/app/public/listings -type f \( -iname '*.jpg' -o -iname '*.jpeg' -o -iname '*.png' -o -iname '*.webp' \) 2>/dev/null | head -n 1 || true)
           if [ -n "$SAMPLE" ]; then
             echo "PREWARM_SAMPLE=$SAMPLE"
-            curl -fsS --max-time 240 -F "file=@$SAMPLE" http://127.0.0.1:8092/api/remove -o /tmp/used-rembg-test.png
+            HEADERS=/tmp/used-rembg-headers.txt
+            curl -fsS --max-time 240 -D "$HEADERS" -F "file=@$SAMPLE" http://127.0.0.1:8092/api/remove -o /tmp/used-rembg-test.png
             test -s /tmp/used-rembg-test.png
             file /tmp/used-rembg-test.png || true
-            rm -f /tmp/used-rembg-test.png
-            echo 'REMBG_PREWARM=OK'
+            grep -iE 'x-transparent-canvas|x-cropped-canvas' "$HEADERS" || true
+            rm -f /tmp/used-rembg-test.png "$HEADERS"
+            echo 'REMBG_TIGHT_CROP_PREWARM=OK'
           else
             echo 'No existing image found; service is installed and will download its model on first image.'
           fi
