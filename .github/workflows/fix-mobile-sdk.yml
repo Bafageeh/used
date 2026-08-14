@@ -1,0 +1,44 @@
+name: Fix Used Mobile SDK
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - ".github/workflows/fix-mobile-sdk.yml"
+
+permissions:
+  contents: write
+
+jobs:
+  fix-sdk:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: true
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22.13.1'
+          cache: npm
+          cache-dependency-path: mobile/package-lock.json
+
+      - name: Align Expo SDK dependencies
+        working-directory: mobile
+        run: |
+          npm ci
+          npx expo install --fix
+          npx expo-doctor@latest
+
+      - name: Commit dependency alignment
+        run: |
+          if git diff --quiet -- mobile/package.json mobile/package-lock.json; then
+            echo "No dependency changes needed"
+            exit 0
+          fi
+          git config user.name "Bafageeh"
+          git config user.email "a.baf@live.com"
+          git add mobile/package.json mobile/package-lock.json
+          git commit -m "Align Used mobile dependencies with Expo SDK 57"
+          git push origin main
