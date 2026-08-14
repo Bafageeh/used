@@ -1,0 +1,71 @@
+name: Fix Region Filter Live
+
+on:
+  push:
+    paths:
+      - '.github/workflows/fix-region-filter-live.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  actions: write
+
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Patch region filtering
+        run: |
+          python3 <<'PY'
+          from pathlib import Path
+          p = Path('mobile/App.tsx')
+          s = p.read_text()
+
+          old = """  const toggleRegionDraft = (name: string) => {\n    setRegionDraft((current) => current.includes(name) ? current.filter((x) => x !== name) : [...current, name]);\n  };"""
+          new = """  const toggleRegionDraft = (name: string) => {\n    const next = regionDraft.includes(name) ? regionDraft.filter((x) => x !== name) : [...regionDraft, name];\n    setRegionDraft(next);\n    setSelectedRegions(next);\n  };"""
+          if old not in s:
+              raise SystemExit('toggleRegionDraft snippet not found')
+          s = s.replace(old, new, 1)
+
+          s = s.replace("<Pressable onPress={() => setRegionDraft([])} hitSlop={8}>", "<Pressable onPress={() => { setRegionDraft([]); setSelectedRegions([]); }} hitSlop={8}>", 1)
+          s = s.replace("<Pressable style={styles.regionRow} onPress={() => setRegionDraft([])}>", "<Pressable style={styles.regionRow} onPress={() => { setRegionDraft([]); setSelectedRegions([]); }}>", 1)
+          s = s.replace("regionOverlay: { ...StyleSheet.absoluteFill, zIndex: 70 },", "regionOverlay: { ...StyleSheet.absoluteFill, zIndex: 70, elevation: 30 },", 1)
+
+          # Make the Apply button only close the sheet; filtering is already live.
+          s = s.replace("onPress={() => { setSelectedRegions(regionDraft); setRegionOpen(false); }}", "onPress={() => setRegionOpen(false)}", 1)
+
+          p.write_text(s)
+          PY
+
+      - name: Validate mobile
+        working-directory: mobile
+        run: |
+          npm install --no-package-lock --no-audit --no-fund
+          npx tsc --noEmit
+
+      - name: Commit changes
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add mobile/App.tsx
+          if git diff --cached --quiet; then
+            echo 'No changes'
+          else
+            git commit -m 'Apply region filters immediately'
+            git push origin main
+          fi
+
+      - name: Restart Expo
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          curl -fsS -X POST \
+            -H "Authorization: Bearer $GH_TOKEN" \
+            -H "Accept: application/vnd.github+json" \
+            https://api.github.com/repos/${{ github.repository }}/actions/workflows/start-expo.yml/dispatches \
+            -d '{"ref":"main"}'
