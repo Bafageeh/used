@@ -1,0 +1,44 @@
+name: Align Used Mobile to Expo SDK 54
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - ".github/workflows/downgrade-used-sdk54.yml"
+
+permissions:
+  contents: write
+
+jobs:
+  align-sdk54:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20.19.4
+          cache: npm
+          cache-dependency-path: mobile/package-lock.json
+
+      - name: Align dependencies to Expo SDK 54
+        working-directory: mobile
+        run: |
+          npm install expo@~54.0.0 --save
+          npx expo install --fix
+          npx expo-doctor@latest
+
+      - name: Commit aligned dependencies
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add mobile/package.json mobile/package-lock.json mobile/app.json
+          if git diff --cached --quiet; then
+            echo "No dependency changes to commit"
+          else
+            git commit -m "Align Used mobile with Expo SDK 54 for physical Expo Go"
+            git push origin HEAD:main
+          fi
