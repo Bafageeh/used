@@ -1,0 +1,105 @@
+name: Fix Used Image Upload
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - ".github/workflows/fix-used-image-upload.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  actions: write
+
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Patch mobile upload to Expo File + expo/fetch
+        run: |
+          python3 <<'PY'
+          from pathlib import Path
+          import json
+
+          app = Path('mobile/App.tsx')
+          text = app.read_text()
+
+          import_old = "import * as ImagePicker from 'expo-image-picker';\n"
+          import_new = "import * as ImagePicker from 'expo-image-picker';\nimport { fetch as expoFetch } from 'expo/fetch';\nimport { File } from 'expo-file-system';\n"
+          if "from 'expo-file-system'" not in text:
+              if import_old not in text:
+                  raise SystemExit('ImagePicker import anchor not found')
+              text = text.replace(import_old, import_new, 1)
+
+          old = '''      const form = new FormData();
+      images.forEach((asset, index) => {
+        form.append('images[]', {
+          uri: asset.uri,
+          name: asset.fileName || `listing-${listing.id}-${index + 1}.jpg`,
+          type: asset.mimeType || 'image/jpeg',
+        } as any);
+      });
+      await request(`/listings/${listing.id}/images`, { method: 'POST', body: form }, token);'''
+
+          new = '''      const form = new FormData();
+      for (const asset of images) {
+        const file = new File(asset.uri);
+        form.append('images[]', file as any);
+      }
+      const uploadResponse = await expoFetch(`${API_URL}/listings/${listing.id}/images`, {
+        method: 'POST',
+        headers: {
+          Accept: 'application/json',
+          Authorization: `Bearer ${token}`,
+        },
+        body: form,
+      });
+      const uploadData = await uploadResponse.json().catch(() => ({}));
+      if (!uploadResponse.ok) {
+        const errors = uploadData?.errors
+          ? Object.values(uploadData.errors).flat().join('، ')
+          : '';
+        throw new Error(errors || uploadData?.message || `تعذر رفع الصور (${uploadResponse.status})`);
+      }'''
+
+          if old not in text:
+              if 'const file = new File(asset.uri);' not in text:
+                  raise SystemExit('Old FormData upload block not found')
+          else:
+              text = text.replace(old, new, 1)
+
+          app.write_text(text)
+
+          pkg_path = Path('mobile/package.json')
+          pkg = json.loads(pkg_path.read_text())
+          pkg.setdefault('dependencies', {})['expo-file-system'] = '~57.0.2'
+          pkg_path.write_text(json.dumps(pkg, ensure_ascii=False, indent=2) + '\n')
+          PY
+
+      - name: Validate dependency alignment
+        working-directory: mobile
+        run: |
+          npm install --package-lock-only
+          npx expo install --check
+
+      - name: Commit patch
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add mobile/App.tsx mobile/package.json mobile/package-lock.json
+          if git diff --cached --quiet; then
+            echo 'No patch changes required.'
+          else
+            git commit -m "Use Expo File objects for listing image uploads"
+            git push origin HEAD:main
+          fi
+
+      - name: Restart Expo with patched main
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          sleep 2
+          gh workflow run start-expo.yml --ref main
+          echo 'Requested Start Used Expo for patched main.'
