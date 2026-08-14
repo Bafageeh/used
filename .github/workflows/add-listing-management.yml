@@ -36,6 +36,7 @@ jobs:
 
       - name: Commit listing management
         run: |
+          git restore mobile/package.json mobile/package-lock.json 2>/dev/null || true
           if git diff --quiet -- mobile/App.tsx; then
             echo 'No listing management changes required.'
           else
