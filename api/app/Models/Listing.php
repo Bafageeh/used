@@ -9,6 +9,8 @@ class Listing extends Model
 {
     use HasFactory;
 
+    protected $hidden = ['price'];
+
     protected $fillable = ['user_id','category_id','title','description','price','city','latitude','longitude','status','published_at','show_phone','views_count','video_path'];
     protected $casts = ['price'=>'decimal:2','latitude'=>'decimal:7','longitude'=>'decimal:7','published_at'=>'datetime','show_phone'=>'boolean'];
 

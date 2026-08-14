@@ -43,7 +43,6 @@ type Listing = {
 };
 type Paginated<T> = { data: T[] };
 type Screen = 'home' | 'favorites' | 'add' | 'notifications' | 'messages' | 'mine' | 'account' | 'admin';
-type SortMode = 'new' | 'price-low' | 'price-high';
 type ViewMode = 'list' | 'grid';
 
 type Coordinates = { latitude: number; longitude: number };
@@ -57,7 +56,6 @@ const TEXT = '#18181B';
 const MUTED = '#71717A';
 const BORDER = '#E7E2EF';
 const SURFACE = '#F8F7FA';
-const money = new Intl.NumberFormat('ar-SA', { maximumFractionDigits: 0 });
 
 
 const REGION_OPTIONS = [
@@ -260,7 +258,7 @@ function ListingCard({
       </View>
       <View style={[styles.cardBody, compact && styles.cardBodyGrid]}>
         <Text numberOfLines={2} style={[styles.cardTitle, compact && styles.cardTitleGrid]}>{item.title}</Text>
-        <Text style={styles.price}>{item.price ? `${money.format(Number(item.price))} ر.س` : 'السعر عند التواصل'}</Text>
+        <Text style={styles.price}>مجانا</Text>
         <View style={styles.metaRow}>
           <Ionicons name="location-outline" size={16} color={MUTED} />
           <Text numberOfLines={1} style={styles.metaText}>{item.city || 'بدون مدينة'}</Text>
@@ -336,7 +334,6 @@ function CreateListing({ categories, token, onPublished }: { categories: Categor
   const [categoryId, setCategoryId] = useState<number>();
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
-  const [price, setPrice] = useState('');
   const [city, setCity] = useState('');
   const [showPhone, setShowPhone] = useState(true);
   const [images, setImages] = useState<ImagePicker.ImagePickerAsset[]>([]);
@@ -413,7 +410,6 @@ function CreateListing({ categories, token, onPublished }: { categories: Categor
           category_id: categoryId,
           title: title.trim(),
           description: description.trim(),
-          price: price.trim() || null,
           city: city.trim(),
           latitude: coords?.latitude ?? null,
           longitude: coords?.longitude ?? null,
@@ -500,7 +496,6 @@ function CreateListing({ categories, token, onPublished }: { categories: Categor
 
       <TextInput style={styles.input} value={title} onChangeText={setTitle} placeholder="عنوان الإعلان" textAlign="right" />
       <TextInput style={[styles.input, styles.textarea]} value={description} onChangeText={setDescription} placeholder="اكتب وصف السلعة وحالتها بالتفصيل..." multiline textAlignVertical="top" textAlign="right" />
-      <TextInput style={styles.input} value={price} onChangeText={setPrice} placeholder="السعر (اختياري)" keyboardType="decimal-pad" textAlign="right" />
       <TextInput style={styles.input} value={city} onChangeText={setCity} placeholder="المدينة" textAlign="right" />
 
       <Pressable style={[styles.locationButton, coords && styles.locationButtonDone]} onPress={useMyLocation} disabled={locating}>
@@ -537,7 +532,6 @@ function EditListing({
   const [categoryId, setCategoryId] = useState<number>(listing.category?.id || listing.category_id || 0);
   const [title, setTitle] = useState(listing.title || '');
   const [description, setDescription] = useState(listing.description || '');
-  const [price, setPrice] = useState(listing.price == null ? '' : String(listing.price));
   const [city, setCity] = useState(listing.city || '');
   const [showPhone, setShowPhone] = useState(listing.show_phone !== false);
   const [status, setStatus] = useState<'published' | 'sold' | 'archived'>(listing.status === 'sold' || listing.status === 'archived' ? listing.status : 'published');
@@ -632,7 +626,6 @@ function EditListing({
           category_id: categoryId,
           title: title.trim(),
           description: description.trim(),
-          price: price.trim() || null,
           city: city.trim(),
           latitude: coords?.latitude ?? null,
           longitude: coords?.longitude ?? null,
@@ -734,7 +727,6 @@ function EditListing({
 
       <TextInput style={styles.input} value={title} onChangeText={setTitle} placeholder="عنوان الإعلان" textAlign="right" />
       <TextInput style={[styles.input, styles.textarea]} value={description} onChangeText={setDescription} placeholder="وصف السلعة" multiline textAlignVertical="top" textAlign="right" />
-      <TextInput style={styles.input} value={price} onChangeText={setPrice} placeholder="السعر (اختياري)" keyboardType="decimal-pad" textAlign="right" />
       <TextInput style={styles.input} value={city} onChangeText={setCity} placeholder="المدينة" textAlign="right" />
 
       <Pressable style={[styles.locationButton, coords && styles.locationButtonDone]} onPress={useMyLocation} disabled={locating}>
@@ -791,9 +783,6 @@ export default function App() {
   const [regionSearch, setRegionSearch] = useState('');
   const [regionOpen, setRegionOpen] = useState(false);
   const [filterOpen, setFilterOpen] = useState(false);
-  const [minPrice, setMinPrice] = useState('');
-  const [maxPrice, setMaxPrice] = useState('');
-  const [sortMode, setSortMode] = useState<SortMode>('new');
   const [viewMode, setViewMode] = useState<ViewMode>('list');
   const [favorites, setFavorites] = useState<number[]>([]);
   const [nearCoords, setNearCoords] = useState<Coordinates | null>(null);
@@ -858,15 +847,9 @@ export default function App() {
   const visibleListings = useMemo(() => {
     let rows = [...listings];
     if (selectedRegions.length) rows = rows.filter((item) => selectedRegions.some((region) => listingMatchesRegion(item, region)));
-    const min = Number(minPrice);
-    const max = Number(maxPrice);
-    if (minPrice.trim() && Number.isFinite(min)) rows = rows.filter((x) => Number(x.price || 0) >= min);
-    if (maxPrice.trim() && Number.isFinite(max)) rows = rows.filter((x) => Number(x.price || 0) <= max);
-    if (sortMode === 'price-low') rows.sort((a, b) => Number(a.price || Number.MAX_SAFE_INTEGER) - Number(b.price || Number.MAX_SAFE_INTEGER));
-    if (sortMode === 'price-high') rows.sort((a, b) => Number(b.price || 0) - Number(a.price || 0));
     if (nearMode && nearCoords) rows.sort((a, b) => distanceKm(nearCoords, a) - distanceKm(nearCoords, b));
     return rows;
-  }, [listings, selectedRegions, minPrice, maxPrice, sortMode, nearMode, nearCoords]);
+  }, [listings, selectedRegions, nearMode, nearCoords]);
 
   const favoriteListings = useMemo(() => listings.filter((x) => favorites.includes(x.id)), [listings, favorites]);
 
@@ -981,9 +964,6 @@ export default function App() {
   const resetFilters = () => {
     setSelectedCategory(undefined);
     setSelectedRegions([]);
-    setMinPrice('');
-    setMaxPrice('');
-    setSortMode('new');
     setNearMode(false);
     setQuery('');
     setSearchDraft('');
@@ -1089,19 +1069,12 @@ export default function App() {
       {filterOpen ? (
         <View style={styles.inlinePanel}>
           <View style={styles.panelTopRow}><Pressable onPress={resetFilters}><Text style={styles.resetText}>إعادة الضبط</Text></Pressable><Text style={styles.panelTitle}>تصفية النتائج</Text></View>
-          <View style={styles.priceFilterRow}>
-            <TextInput style={styles.priceInput} value={minPrice} onChangeText={setMinPrice} placeholder="أقل سعر" keyboardType="numeric" textAlign="right" />
-            <TextInput style={styles.priceInput} value={maxPrice} onChangeText={setMaxPrice} placeholder="أعلى سعر" keyboardType="numeric" textAlign="right" />
-          </View>
-          <Text style={styles.sortLabel}>الترتيب</Text>
-          <View style={styles.sortRow}>
-            {([
-              ['new', 'الأحدث'], ['price-low', 'السعر الأقل'], ['price-high', 'السعر الأعلى'],
-            ] as [SortMode, string][]).map(([key, label]) => (
-              <Pressable key={key} style={[styles.sortChip, sortMode === key && styles.sortChipActive]} onPress={() => setSortMode(key)}>
-                <Text style={[styles.sortChipText, sortMode === key && styles.sortChipTextActive]}>{label}</Text>
-              </Pressable>
-            ))}
+          <View style={{ marginTop: 12, minHeight: 54, borderRadius: 14, backgroundColor: PURPLE_LIGHT, paddingHorizontal: 14, flexDirection: 'row-reverse', alignItems: 'center', gap: 9 }}>
+            <Ionicons name="gift-outline" size={21} color={PURPLE} />
+            <View style={{ flex: 1, alignItems: 'flex-end' }}>
+              <Text style={{ color: PURPLE_DARK, fontSize: 13, fontWeight: '900' }}>كل السلع مجانا</Text>
+              <Text style={{ color: MUTED, fontSize: 10, marginTop: 2 }}>لا يوجد سعر أو فرز حسب السعر</Text>
+            </View>
           </View>
         </View>
       ) : null}
@@ -1138,7 +1111,7 @@ export default function App() {
           ) : null}
           <View style={styles.detailBody}>
             <Text style={styles.detailTitle}>{detail.title}</Text>
-            <Text style={styles.detailPrice}>{detail.price ? `${money.format(Number(detail.price))} ر.س` : 'السعر عند التواصل'}</Text>
+            <Text style={styles.detailPrice}>مجانا</Text>
             <View style={styles.detailMetaLine}><Text style={styles.detailMetaText}>{detail.city}</Text><Ionicons name="location-outline" size={19} color={PURPLE} /></View>
             <View style={styles.detailSeparator} />
             <Text style={styles.detailSectionTitle}>الوصف</Text>

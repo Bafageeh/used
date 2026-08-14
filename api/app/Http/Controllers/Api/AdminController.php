@@ -89,10 +89,11 @@ class AdminController extends Controller
     {
         $this->authorizeAdmin($request);
         $data=$request->validate([
-            'title'=>['sometimes','string','max:120'],'description'=>['sometimes','string','max:5000'],'price'=>['sometimes','nullable','numeric','min:0'],
+            'title'=>['sometimes','string','max:120'],'description'=>['sometimes','string','max:5000'],
             'city'=>['sometimes','string','max:80'],'category_id'=>['sometimes','exists:categories,id'],'show_phone'=>['sometimes','boolean'],
             'status'=>['sometimes',Rule::in(['draft','published','sold','archived'])],
         ]);
+        $data['price']=null;
         if (($data['status'] ?? null)==='published') $data['published_at']=$listing->published_at ?? now();
         $listing->update($data);
         return $listing->fresh(['user:id,name,phone,username','category:id,name','images']);
