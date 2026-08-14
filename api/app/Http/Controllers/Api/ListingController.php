@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use App\Models\Listing;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Storage;
 use Illuminate\Validation\Rule;
 
 class ListingController extends Controller
@@ -46,7 +47,12 @@ class ListingController extends Controller
   return $listing->fresh(['category','images']);
  }
  public function destroy(Request $request, Listing $listing) {
-  abort_unless($request->user()->id===$listing->user_id,403); $listing->delete(); return response()->noContent();
+  abort_unless($request->user()->id===$listing->user_id,403);
+  $paths=$listing->images()->pluck('path')->filter()->all();
+  if ($paths) Storage::disk('public')->delete($paths);
+  Storage::disk('public')->deleteDirectory("listings/{$listing->id}");
+  $listing->delete();
+  return response()->noContent();
  }
  private function validated(Request $request): array {
   return $request->validate([
