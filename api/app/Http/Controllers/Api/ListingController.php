@@ -40,6 +40,11 @@ class ListingController extends Controller
   if (($data['status'] ?? null)==='published' && !$listing->published_at) $data['published_at']=now();
   $listing->update($data); return $listing->fresh(['category','images']);
  }
+ public function refresh(Request $request, Listing $listing) {
+  abort_unless($request->user()->id===$listing->user_id,403);
+  $listing->forceFill(['status'=>'published','published_at'=>now()])->save();
+  return $listing->fresh(['category','images']);
+ }
  public function destroy(Request $request, Listing $listing) {
   abort_unless($request->user()->id===$listing->user_id,403); $listing->delete(); return response()->noContent();
  }
