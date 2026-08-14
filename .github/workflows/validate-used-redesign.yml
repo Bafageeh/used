@@ -1,0 +1,30 @@
+name: Validate Used Redesign
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - ".github/workflows/validate-used-redesign.yml"
+  workflow_dispatch:
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: mobile
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22.13.1'
+      - name: Install dependencies
+        run: |
+          rm -f package-lock.json
+          npm install
+      - name: TypeScript check
+        run: npx tsc --noEmit
+      - name: Expo dependency check
+        run: npx expo install --check
+      - name: Bundle Android JavaScript
+        run: npx expo export --platform android --output-dir /tmp/used-dist
