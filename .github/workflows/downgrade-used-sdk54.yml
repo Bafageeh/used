@@ -6,6 +6,7 @@ on:
     branches: [main]
     paths:
       - ".github/workflows/downgrade-used-sdk54.yml"
+      - "mobile/package.json"
 
 permissions:
   contents: write
