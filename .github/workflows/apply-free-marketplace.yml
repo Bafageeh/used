@@ -1,0 +1,53 @@
+name: Apply Free Marketplace
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - ".github/scripts/free-marketplace.py"
+      - ".github/workflows/apply-free-marketplace.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  actions: write
+
+jobs:
+  apply:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Apply free-only patch
+        run: python3 .github/scripts/free-marketplace.py
+      - name: Validate mobile
+        working-directory: mobile
+        run: |
+          npm install
+          npx expo install --fix
+          npx tsc --noEmit
+          npx expo install --check
+          npx expo export --platform android --output-dir /tmp/used-free-marketplace-bundle
+      - name: Validate API
+        run: |
+          php -l api/app/Http/Controllers/Api/ListingController.php
+          php -l api/app/Http/Controllers/Api/AdminController.php
+          php -l api/app/Models/Listing.php
+      - name: Commit application changes
+        run: |
+          git checkout -- mobile/package.json mobile/package-lock.json || true
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add mobile/App.tsx api/app/Http/Controllers/Api/ListingController.php api/app/Http/Controllers/Api/AdminController.php api/app/Models/Listing.php
+          git diff --cached --quiet || git commit -m "Make every marketplace listing free"
+          git push origin HEAD:main
+      - name: Deploy API and restart Expo
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh workflow run deploy.yml --ref main
+          gh workflow run start-expo.yml --ref main
