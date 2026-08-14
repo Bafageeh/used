@@ -1,0 +1,20 @@
+name: Dispatch Used Expo Now
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - ".github/workflows/dispatch-used-expo-now.yml"
+
+permissions:
+  actions: write
+  contents: read
+
+jobs:
+  dispatch:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Start Used Expo workflow
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh workflow run start-expo.yml --repo Bafageeh/used --ref main
