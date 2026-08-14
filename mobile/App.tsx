@@ -12,6 +12,7 @@ import {
   View,
 } from 'react-native';
 import * as ImagePicker from 'expo-image-picker';
+import * as FileSystem from 'expo-file-system/legacy';
 
 type Category = { id: number; name: string };
 type ListingImage = { id: number; url?: string; path?: string };
@@ -158,15 +159,34 @@ function CreateListing({ categories, token, onPublished }: { categories: Categor
         }),
       }, token);
 
-      const form = new FormData();
-      images.forEach((asset, index) => {
-        form.append('images[]', {
-          uri: asset.uri,
-          name: asset.fileName || `listing-${listing.id}-${index + 1}.jpg`,
-          type: asset.mimeType || 'image/jpeg',
-        } as any);
-      });
-      await request(`/listings/${listing.id}/images`, { method: 'POST', body: form }, token);
+      for (const asset of images) {
+        const upload = await FileSystem.uploadAsync(
+          `${API_URL}/listings/${listing.id}/images`,
+          asset.uri,
+          {
+            httpMethod: 'POST',
+            uploadType: FileSystem.FileSystemUploadType.MULTIPART,
+            fieldName: 'images[]',
+            mimeType: asset.mimeType || 'image/jpeg',
+            headers: {
+              Accept: 'application/json',
+              Authorization: `Bearer ${token}`,
+            },
+          },
+        );
+
+        if (upload.status < 200 || upload.status >= 300) {
+          let message = `تعذر رفع الصورة (${upload.status})`;
+          try {
+            const body = JSON.parse(upload.body || '{}');
+            const errors = body?.errors
+              ? Object.values(body.errors).flat().join('، ')
+              : '';
+            message = errors || body?.message || message;
+          } catch {}
+          throw new Error(message);
+        }
+      }
       Alert.alert('تم بنجاح', `تم نشر الإعلان ورفع ${images.length} صورة.`);
       onPublished();
     } catch (e) {
