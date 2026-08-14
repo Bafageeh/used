@@ -36,15 +36,9 @@ jobs:
 
           PY=''
           for candidate in python3.13 python3.12 python3.11 python3; do
-            if command -v "$candidate" >/dev/null 2>&1; then
-              if "$candidate" - <<'PY' >/dev/null 2>&1
-import sys
-raise SystemExit(0 if (3, 11) <= sys.version_info[:2] < (3, 14) else 1)
-PY
-              then
-                PY="$candidate"
-                break
-              fi
+            if command -v "$candidate" >/dev/null 2>&1 && "$candidate" -c 'import sys; raise SystemExit(0 if (3,11) <= sys.version_info[:2] < (3,14) else 1)' >/dev/null 2>&1; then
+              PY="$candidate"
+              break
             fi
           done
           if [ -z "$PY" ]; then
@@ -70,9 +64,7 @@ PY
           fi
           pkill -f 'rembg s.*127.0.0.1.*8092' 2>/dev/null || true
           sleep 1
-          nohup env U2NET_HOME="$API_PATH/storage/rembg-models" OMP_NUM_THREADS=2 \
-            "$VENV/bin/rembg" s --host 127.0.0.1 --port 8092 --no-ui \
-            > "$API_PATH/storage/logs/rembg.log" 2>&1 < /dev/null &
+          nohup env U2NET_HOME="$API_PATH/storage/rembg-models" OMP_NUM_THREADS=2 "$VENV/bin/rembg" s --host 127.0.0.1 --port 8092 --no-ui > "$API_PATH/storage/logs/rembg.log" 2>&1 < /dev/null &
           echo $! > storage/rembg.pid
 
           for i in $(seq 1 30); do
