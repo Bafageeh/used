@@ -53,16 +53,21 @@ jobs:
           SERVER_USER: ${{ secrets.SERVER_USER }}
           DEPLOY_PATH: ${{ secrets.DEPLOY_PATH }}
         run: |
-          ssh -i ~/.ssh/used_expo_key -p "$SERVER_PORT" "$SERVER_USER@$SERVER_HOST" "
+          ssh -i ~/.ssh/used_expo_key -p "$SERVER_PORT" "$SERVER_USER@$SERVER_HOST" "set -e
             MOBILE_PATH=\$(dirname '$DEPLOY_PATH')/mobile
             cd \"\$MOBILE_PATH\"
-            pkill -f 'expo start.*8091' 2>/dev/null || true
-            pkill -f 'expo.*--port 8091' 2>/dev/null || true
+            if [ -f expo.pid ]; then
+              OLD_PID=\$(cat expo.pid 2>/dev/null || true)
+              if [ -n \"\$OLD_PID\" ]; then kill \"\$OLD_PID\" 2>/dev/null || true; fi
+            fi
+            if command -v fuser >/dev/null 2>&1; then fuser -k 8091/tcp 2>/dev/null || true; fi
             rm -f expo.log expo.pid
-            nohup npx expo start --clear --go --tunnel --port 8091 > expo.log 2>&1 < /dev/null &
-            echo \$! > expo.pid
-          " || true
-          sleep 30
+            nohup npx expo start --clear --go --tunnel --port 8091 > \"\$MOBILE_PATH/expo.log\" 2>&1 < /dev/null &
+            NEW_PID=\$!
+            echo \"\$NEW_PID\" > \"\$MOBILE_PATH/expo.pid\"
+            echo \"Started Expo PID \$NEW_PID\"
+          "
+          sleep 45
 
       - name: Verify Expo and print test URL
         env:
@@ -79,5 +84,5 @@ jobs:
             echo '--- EXPO URL ---'
             grep -Eo 'https://[A-Za-z0-9.-]+\.exp\.direct' expo.log | tail -n 1 || true
             echo '--- LAST LOG LINES ---'
-            tail -n 80 expo.log || true
+            tail -n 100 expo.log || true
           "
