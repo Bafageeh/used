@@ -1,0 +1,53 @@
+name: Apply Camera And Video Support
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - ".github/scripts/add-camera-video.py"
+      - ".github/workflows/apply-camera-video.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  actions: write
+
+jobs:
+  apply:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Apply mobile patch
+        run: python3 .github/scripts/add-camera-video.py
+      - name: Validate mobile
+        working-directory: mobile
+        run: |
+          npm install
+          npx tsc --noEmit
+          npx expo install --check
+          npx expo export --platform android --output-dir /tmp/used-camera-video-bundle
+      - name: Validate PHP
+        run: |
+          php -l api/app/Http/Controllers/Api/ListingVideoController.php
+          php -l api/app/Models/Listing.php
+          php -l api/routes/api.php
+          php -l api/database/migrations/2026_08_14_185500_add_video_to_listings.php
+      - name: Commit mobile changes
+        run: |
+          git checkout -- mobile/package-lock.json || true
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add mobile/App.tsx
+          git diff --cached --quiet || git commit -m "Add direct camera and optional listing video"
+          git push origin HEAD:main
+      - name: Dispatch deployments
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh workflow run deploy.yml --ref main
+          gh workflow run start-expo.yml --ref main
