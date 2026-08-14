@@ -6,15 +6,14 @@
     "orientation": "portrait",
     "scheme": "used",
     "userInterfaceStyle": "light",
+    "icon": "./assets/icon.png",
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "sa.pm.used"
     },
     "android": {
       "package": "sa.pm.used",
-      "adaptiveIcon": {
-        "backgroundColor": "#0F766E"
-      }
+      "icon": "./assets/icon.png"
     }
   }
 }
