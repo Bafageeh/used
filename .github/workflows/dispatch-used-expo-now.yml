@@ -17,4 +17,6 @@ jobs:
       - name: Start Used Expo workflow
         env:
           GH_TOKEN: ${{ github.token }}
-        run: gh workflow run start-expo.yml --repo Bafageeh/used --ref main
+        run: |
+          echo "Dispatching latest main with detail owner management"
+          gh workflow run start-expo.yml --repo Bafageeh/used --ref main
