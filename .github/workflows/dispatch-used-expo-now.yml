@@ -18,5 +18,5 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          echo "Dispatching final main with deferred automatic background processing"
+          echo "Dispatching latest main with listing item condition dropdown"
           gh workflow run start-expo.yml --repo Bafageeh/used --ref main
