@@ -17,10 +17,11 @@ import * as ImagePicker from 'expo-image-picker';
 import * as FileSystem from 'expo-file-system/legacy';
 import * as Location from 'expo-location';
 import * as SecureStore from 'expo-secure-store';
+import AdminPanel from './AdminPanel';
 
 type Category = { id: number; name: string; slug?: string };
 type ListingImage = { id: number; url?: string; path?: string };
-type User = { id: number; name: string; phone: string; role?: string };
+type User = { id: number; name: string; phone?: string | null; username?: string | null; role?: string };
 type Listing = {
   id: number;
   title: string;
@@ -39,7 +40,7 @@ type Listing = {
   status?: 'draft' | 'published' | 'sold' | 'archived';
 };
 type Paginated<T> = { data: T[] };
-type Screen = 'home' | 'favorites' | 'add' | 'notifications' | 'messages' | 'mine' | 'account';
+type Screen = 'home' | 'favorites' | 'add' | 'notifications' | 'messages' | 'mine' | 'account' | 'admin';
 type SortMode = 'new' | 'price-low' | 'price-high';
 type ViewMode = 'list' | 'grid';
 
@@ -225,37 +226,50 @@ function ListingCard({
 }
 
 function LoginPanel({ onLogin }: { onLogin: (token: string, user: User) => void }) {
+  const [mode, setMode] = useState<'user' | 'admin'>('user');
   const [phone, setPhone] = useState('');
   const [pin, setPin] = useState('');
+  const [username, setUsername] = useState('');
+  const [password, setPassword] = useState('');
   const [busy, setBusy] = useState(false);
   const submit = async () => {
-    const normalized = phone.replace(/\D/g, '').replace(/^0?5/, '9665');
-    if (!/^9665\d{8}$/.test(normalized)) return Alert.alert('الجوال', 'أدخل رقم الجوال السعودي بشكل صحيح.');
-    if (!/^\d{4,8}$/.test(pin)) return Alert.alert('الرقم السري', 'أدخل الرقم السري من 4 إلى 8 أرقام.');
     setBusy(true);
     try {
-      const result = await request<{ token: string; user: User }>('/auth/login', {
-        method: 'POST',
-        body: JSON.stringify({ phone: normalized, pin, device_name: 'Expo Go Android' }),
-      });
+      let result: { token: string; user: User };
+      if (mode === 'admin') {
+        if (!username.trim() || !password) throw new Error('أدخل اسم المستخدم وكلمة المرور.');
+        result = await request<{ token: string; user: User }>('/auth/admin-login', {
+          method: 'POST', body: JSON.stringify({ username: username.trim(), password, device_name: 'Used Admin Expo Go' }),
+        });
+      } else {
+        const normalized = phone.replace(/\D/g, '').replace(/^0?5/, '9665');
+        if (!/^9665\d{8}$/.test(normalized)) throw new Error('أدخل رقم الجوال السعودي بشكل صحيح.');
+        if (!/^\d{4,8}$/.test(pin)) throw new Error('أدخل الرقم السري من 4 إلى 8 أرقام.');
+        result = await request<{ token: string; user: User }>('/auth/login', {
+          method: 'POST', body: JSON.stringify({ phone: normalized, pin, device_name: 'Expo Go Android' }),
+        });
+      }
       onLogin(result.token, result.user);
-    } catch (e) {
-      Alert.alert('تعذر تسجيل الدخول', e instanceof Error ? e.message : 'حدث خطأ غير متوقع.');
-    } finally {
-      setBusy(false);
-    }
+    } catch (e) { Alert.alert('تعذر تسجيل الدخول', e instanceof Error ? e.message : 'حدث خطأ غير متوقع.'); }
+    finally { setBusy(false); }
   };
   return (
     <ScrollView contentContainerStyle={styles.formPage} keyboardShouldPersistTaps="handled">
-      <View style={styles.formIcon}><Ionicons name="person-outline" size={34} color={PURPLE} /></View>
-      <Text style={styles.sectionTitle}>تسجيل الدخول</Text>
-      <Text style={styles.help}>سجّل الدخول لإضافة إعلان ومتابعة إعلاناتك.</Text>
-      <View style={styles.inputShell}><Ionicons name="call-outline" size={20} color={MUTED} /><TextInput style={styles.inputInner} value={phone} onChangeText={setPhone} placeholder="05xxxxxxxx" keyboardType="phone-pad" textAlign="right" /></View>
-      <View style={styles.inputShell}><Ionicons name="lock-closed-outline" size={20} color={MUTED} /><TextInput style={styles.inputInner} value={pin} onChangeText={setPin} placeholder="الرقم السري" keyboardType="number-pad" secureTextEntry textAlign="right" /></View>
-      <Pressable style={[styles.primaryButton, busy && styles.disabled]} onPress={submit} disabled={busy}>
-        {busy ? <ActivityIndicator color="#fff" /> : <Text style={styles.primaryButtonText}>دخول</Text>}
-      </Pressable>
-      <Text style={styles.note}>التسجيل واستعادة الرقم السري عبر واتساب سيُربطان بهذه الشاشة في المرحلة التالية.</Text>
+      <View style={styles.formIcon}><Ionicons name={mode === 'admin' ? 'shield-checkmark-outline' : 'person-outline'} size={34} color={PURPLE} /></View>
+      <Text style={styles.sectionTitle}>{mode === 'admin' ? 'دخول الإدارة' : 'تسجيل الدخول'}</Text>
+      <Text style={styles.help}>{mode === 'admin' ? 'دخول المدير للتحكم الكامل بالحسابات والإعلانات والإعدادات.' : 'سجّل الدخول لإضافة إعلان ومتابعة إعلاناتك.'}</Text>
+      <View style={{ flexDirection: 'row-reverse', gap: 8, marginBottom: 14 }}>
+        <Pressable onPress={() => setMode('user')} style={{ flex:1, minHeight:44, borderRadius:12, alignItems:'center', justifyContent:'center', backgroundColor:mode==='user'?PURPLE:'#fff', borderWidth:1, borderColor:mode==='user'?PURPLE:BORDER }}><Text style={{ color:mode==='user'?'#fff':PURPLE, fontWeight:'900' }}>مستخدم</Text></Pressable>
+        <Pressable onPress={() => setMode('admin')} style={{ flex:1, minHeight:44, borderRadius:12, alignItems:'center', justifyContent:'center', backgroundColor:mode==='admin'?PURPLE:'#fff', borderWidth:1, borderColor:mode==='admin'?PURPLE:BORDER }}><Text style={{ color:mode==='admin'?'#fff':PURPLE, fontWeight:'900' }}>الإدارة</Text></Pressable>
+      </View>
+      {mode === 'admin' ? <>
+        <View style={styles.inputShell}><Ionicons name="person-circle-outline" size={20} color={MUTED} /><TextInput style={styles.inputInner} value={username} onChangeText={setUsername} placeholder="اسم المستخدم" autoCapitalize="none" textAlign="right" /></View>
+        <View style={styles.inputShell}><Ionicons name="key-outline" size={20} color={MUTED} /><TextInput style={styles.inputInner} value={password} onChangeText={setPassword} placeholder="كلمة المرور" secureTextEntry textAlign="right" /></View>
+      </> : <>
+        <View style={styles.inputShell}><Ionicons name="call-outline" size={20} color={MUTED} /><TextInput style={styles.inputInner} value={phone} onChangeText={setPhone} placeholder="05xxxxxxxx" keyboardType="phone-pad" textAlign="right" /></View>
+        <View style={styles.inputShell}><Ionicons name="lock-closed-outline" size={20} color={MUTED} /><TextInput style={styles.inputInner} value={pin} onChangeText={setPin} placeholder="الرقم السري" keyboardType="number-pad" secureTextEntry textAlign="right" /></View>
+      </>}
+      <Pressable style={[styles.primaryButton, busy && styles.disabled]} onPress={submit} disabled={busy}>{busy ? <ActivityIndicator color="#fff" /> : <Text style={styles.primaryButtonText}>{mode === 'admin' ? 'دخول لوحة الإدارة' : 'دخول'}</Text>}</Pressable>
     </ScrollView>
   );
 }
@@ -816,6 +830,7 @@ export default function App() {
     setToken(nextToken);
     setUser(nextUser);
     SecureStore.setItemAsync('used_auth_token', nextToken).catch(() => undefined);
+    if (nextUser.role === 'admin') setScreen('admin');
   };
 
   const logout = () => {
@@ -1088,6 +1103,7 @@ export default function App() {
       <Pressable style={styles.dangerButton} onPress={logout}><Ionicons name="log-out-outline" size={20} color="#DC2626" /><Text style={styles.dangerText}>تسجيل الخروج</Text></Pressable>
     </ScrollView>
   ) : <LoginPanel onLogin={loggedIn} />;
+  if (screen === 'admin') content = token && user?.role === 'admin' ? <AdminPanel token={token} /> : <LoginPanel onLogin={loggedIn} />;
 
   const isHome = screen === 'home';
   return (
@@ -1096,7 +1112,7 @@ export default function App() {
       {!isHome ? (
         <View style={styles.simpleTopBar}>
           <IconButton name="menu-outline" onPress={() => setMenuOpen(true)} />
-          <Text style={styles.simpleTopTitle}>{screen === 'favorites' ? 'المفضلة' : screen === 'add' ? (editListing ? 'تعديل الإعلان' : 'أضف إعلان') : screen === 'notifications' ? 'الإشعارات' : screen === 'messages' ? 'الرسائل' : screen === 'mine' ? 'إعلاناتي' : 'حسابي'}</Text>
+          <Text style={styles.simpleTopTitle}>{screen === 'favorites' ? 'المفضلة' : screen === 'add' ? (editListing ? 'تعديل الإعلان' : 'أضف إعلان') : screen === 'notifications' ? 'الإشعارات' : screen === 'messages' ? 'الرسائل' : screen === 'mine' ? 'إعلاناتي' : screen === 'admin' ? 'لوحة الإدارة' : 'حسابي'}</Text>
           <Pressable style={styles.simpleHomeButton} onPress={() => setScreen('home')}><Ionicons name="home-outline" size={24} color="#fff" /></Pressable>
         </View>
       ) : null}
@@ -1179,6 +1195,9 @@ export default function App() {
             ] as [Screen, any, string][]).map(([key, icon, label]) => (
               <Pressable key={key} style={styles.sideMenuItem} onPress={() => { setScreen(key); setMenuOpen(false); }}><Ionicons name={icon} size={22} color={PURPLE} /><Text style={styles.sideMenuText}>{label}</Text><Ionicons name="chevron-back" size={18} color="#A1A1AA" /></Pressable>
             ))}
+            {user?.role === 'admin' ? (
+              <Pressable style={[styles.sideMenuItem, { backgroundColor: PURPLE_LIGHT, borderRadius: 12 }]} onPress={() => { setScreen('admin'); setMenuOpen(false); }}><Ionicons name="shield-checkmark-outline" size={22} color={PURPLE} /><Text style={[styles.sideMenuText, { color: PURPLE, fontWeight: '900' }]}>لوحة الإدارة</Text><Ionicons name="chevron-back" size={18} color={PURPLE} /></Pressable>
+            ) : null}
             <View style={styles.sideDivider} />
             <Pressable style={styles.sideMenuItem} onPress={() => { resetFilters(); setMenuOpen(false); setScreen('home'); }}><Ionicons name="refresh-outline" size={22} color={PURPLE} /><Text style={styles.sideMenuText}>مسح البحث والفلاتر</Text><View style={{ width: 18 }} /></Pressable>
           </View>
