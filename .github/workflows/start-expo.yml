@@ -67,7 +67,7 @@ jobs:
             echo \"\$NEW_PID\" > \"\$MOBILE_PATH/expo.pid\"
             echo \"Started Expo PID \$NEW_PID\"
           "
-          sleep 45
+          sleep 30
 
       - name: Verify Expo and print test URL
         env:
@@ -81,8 +81,16 @@ jobs:
             cd \"\$MOBILE_PATH\"
             echo '--- EXPO PROCESS ---'
             if [ -f expo.pid ] && kill -0 \$(cat expo.pid) 2>/dev/null; then echo RUNNING; else echo NOT_RUNNING; fi
-            echo '--- EXPO URL ---'
+            echo '--- EXPO URL FROM LOG ---'
             grep -Eo 'https://[A-Za-z0-9.-]+\.exp\.direct' expo.log | tail -n 1 || true
+            echo '--- TUNNEL API ---'
+            TUNNELS=\$(curl -fsS http://127.0.0.1:4040/api/tunnels 2>/dev/null || true)
+            printf '%s\n' \"\$TUNNELS\"
+            printf '%s\n' \"\$TUNNELS\" | grep -Eo 'https://[^\" ]+' | head -n 5 || true
+            echo '--- EXPO PROCESSES ---'
+            ps -ef | grep -E '[e]xpo|[n]grok|8091' | tail -n 20 || true
+            echo '--- LOCAL SERVER HEADERS ---'
+            curl -sSI http://127.0.0.1:8091 2>/dev/null | head -n 20 || true
             echo '--- LAST LOG LINES ---'
             tail -n 100 expo.log || true
           "
