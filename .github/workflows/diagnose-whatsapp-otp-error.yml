@@ -1,0 +1,41 @@
+name: Diagnose WhatsApp OTP Error
+
+on:
+  push:
+    paths:
+      - ".github/workflows/diagnose-whatsapp-otp-error.yml"
+  workflow_dispatch:
+
+jobs:
+  diagnose:
+    runs-on: ubuntu-latest
+    environment: production
+    steps:
+      - name: Configure SSH
+        env:
+          SERVER_SSH_KEY: ${{ secrets.SERVER_SSH_KEY }}
+          SERVER_HOST: ${{ secrets.SERVER_HOST }}
+          SERVER_PORT: ${{ secrets.SERVER_PORT }}
+        run: |
+          install -m 700 -d ~/.ssh
+          printf '%s\n' "$SERVER_SSH_KEY" > ~/.ssh/used_api_key
+          chmod 600 ~/.ssh/used_api_key
+          ssh-keyscan -p "$SERVER_PORT" -H "$SERVER_HOST" >> ~/.ssh/known_hosts
+
+      - name: Read recent WhatsApp failure safely
+        env:
+          SERVER_HOST: ${{ secrets.SERVER_HOST }}
+          SERVER_PORT: ${{ secrets.SERVER_PORT }}
+          SERVER_USER: ${{ secrets.SERVER_USER }}
+          DEPLOY_PATH: ${{ secrets.DEPLOY_PATH }}
+        run: |
+          ssh -i ~/.ssh/used_api_key -p "$SERVER_PORT" "$SERVER_USER@$SERVER_HOST" "bash -s" <<'REMOTE'
+          set -eu
+          cd '${{ secrets.DEPLOY_PATH }}/api'
+          echo '--- CONFIG ---'
+          php artisan tinker --execute="echo 'template='.config('marketplace.whatsapp.template').PHP_EOL; echo 'phone_id='.(config('marketplace.whatsapp.phone_number_id') ? 'SET' : 'MISSING').PHP_EOL; echo 'token='.(config('marketplace.whatsapp.token') ? 'SET' : 'MISSING').PHP_EOL;"
+          echo '--- RECENT WHATSAPP ERRORS ---'
+          if [ -f storage/logs/laravel.log ]; then
+            grep -i -E 'WhatsApp OTP failed|GraphMethodException|OAuthException|template|phone number|Unsupported post request' storage/logs/laravel.log | tail -n 80 || true
+          fi
+          REMOTE
