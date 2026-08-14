@@ -1,0 +1,50 @@
+name: Repair Used Storage
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - ".github/workflows/repair-used-storage.yml"
+
+jobs:
+  repair:
+    runs-on: ubuntu-latest
+    environment: production
+    steps:
+      - name: Configure SSH
+        env:
+          SERVER_SSH_KEY: ${{ secrets.SERVER_SSH_KEY }}
+          SERVER_HOST: ${{ secrets.SERVER_HOST }}
+          SERVER_PORT: ${{ secrets.SERVER_PORT }}
+        run: |
+          install -m 700 -d ~/.ssh
+          printf '%s\n' "$SERVER_SSH_KEY" > ~/.ssh/used_storage_key
+          chmod 600 ~/.ssh/used_storage_key
+          ssh-keyscan -p "$SERVER_PORT" -H "$SERVER_HOST" >> ~/.ssh/known_hosts
+
+      - name: Repair Laravel public storage
+        env:
+          SERVER_HOST: ${{ secrets.SERVER_HOST }}
+          SERVER_PORT: ${{ secrets.SERVER_PORT }}
+          SERVER_USER: ${{ secrets.SERVER_USER }}
+          DEPLOY_PATH: ${{ secrets.DEPLOY_PATH }}
+        run: |
+          ssh -i ~/.ssh/used_storage_key -p "$SERVER_PORT" "$SERVER_USER@$SERVER_HOST" "bash -s" <<'REMOTE'
+          set -eu
+          API_PATH='${{ secrets.DEPLOY_PATH }}/api'
+          cd "$API_PATH"
+          test -f artisan
+          mkdir -p storage/app/public/listings storage/framework/cache storage/framework/sessions storage/framework/views storage/logs
+          chmod -R ug+rwX storage bootstrap/cache
+          if [ -e public/storage ] && [ ! -L public/storage ]; then
+            mv public/storage "public/storage.backup-$(date +%Y%m%d%H%M%S)"
+          fi
+          php artisan storage:link || test -L public/storage
+          php artisan optimize:clear
+          echo '--- STORAGE LINK ---'
+          ls -ld public/storage
+          echo '--- TARGET ---'
+          readlink -f public/storage
+          echo 'STORAGE_REPAIR=OK'
+          REMOTE
