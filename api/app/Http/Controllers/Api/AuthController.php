@@ -9,6 +9,7 @@ use App\Services\WhatsAppOtpService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
 use Throwable;
 
@@ -60,13 +61,33 @@ class AuthController extends Controller
         if (!$otp || $otp->expires_at->isPast() || $otp->attempts >= 5) return response()->json(['message'=>'انتهت صلاحية الرمز، اطلب رمزًا جديدًا.'],422);
         $otp->increment('attempts');
         if (!Hash::check($data['code'],$otp->code_hash)) return response()->json(['message'=>'رمز التحقق غير صحيح.'],422);
+
         return DB::transaction(function () use ($data,$otp) {
-            $otp->update(['verified_at'=>now()]);
             $user = User::where('phone',$data['phone'])->first();
-            if ($data['purpose']==='register') $user = User::create(['name'=>$data['name'],'phone'=>$data['phone'],'pin'=>$data['pin'],'phone_verified_at'=>now()]);
-            elseif ($data['purpose']==='reset_pin') $user->update(['pin'=>$data['pin'],'phone_verified_at'=>now()]);
+
+            if ($data['purpose'] === 'register') {
+                $user = User::create([
+                    'name' => $data['name'],
+                    'phone' => $data['phone'],
+                    'pin' => $data['pin'],
+                    // The legacy users table requires a password. User login still uses PIN;
+                    // keep a strong random internal password only to satisfy the DB contract.
+                    'password' => Str::random(64),
+                    'role' => 'user',
+                    'is_active' => true,
+                    'phone_verified_at' => now(),
+                ]);
+            } elseif ($data['purpose'] === 'reset_pin') {
+                $user->update(['pin'=>$data['pin'],'phone_verified_at'=>now()]);
+            }
+
             abort_if(!$user || !$user->is_active,403,'الحساب موقوف.');
-            return ['token'=>$user->createToken($data['device_name'] ?? 'mobile')->plainTextToken,'user'=>$user];
+            $otp->update(['verified_at'=>now()]);
+
+            return [
+                'token'=>$user->createToken($data['device_name'] ?? 'mobile')->plainTextToken,
+                'user'=>$user,
+            ];
         });
     }
 
