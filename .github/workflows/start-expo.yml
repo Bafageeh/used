@@ -42,10 +42,11 @@ jobs:
           ssh -i ~/.ssh/used_expo_key -p "$SERVER_PORT" "$SERVER_USER@$SERVER_HOST" "set -e
             MOBILE_PATH='$DEPLOY_PATH/mobile'
             mkdir -p \"\$MOBILE_PATH\"
-            rm -rf \"\$MOBILE_PATH/node_modules\" \"\$MOBILE_PATH/.expo\"
+            rm -rf \"\$MOBILE_PATH/node_modules\" \"\$MOBILE_PATH/.expo\" \"\$MOBILE_PATH/src/app-sdk57-isolation\"
             rm -f \"\$MOBILE_PATH/package-lock.json\"
             tar -C \"\$MOBILE_PATH\" -xzf /tmp/used-mobile.tgz
             rm -f /tmp/used-mobile.tgz
+            if [ -d \"\$MOBILE_PATH/src/app\" ]; then mv \"\$MOBILE_PATH/src/app\" \"\$MOBILE_PATH/src/app-sdk57-isolation\"; fi
             cd \"\$MOBILE_PATH\"
             if [ -f package-lock.json ]; then npm ci; else npm install; fi"
 
