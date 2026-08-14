@@ -1,0 +1,178 @@
+name: Apply Listing Item Condition
+
+on:
+  push:
+    paths:
+      - '.github/workflows/apply-item-condition.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  actions: write
+
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22.13.1'
+
+      - name: Add item condition dropdowns
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          p = Path('mobile/App.tsx')
+          s = p.read_text()
+
+          # Listing type
+          old = "  description?: string;\n  price: string | number | null;"
+          new = "  description?: string;\n  item_condition?: ItemCondition;\n  price: string | number | null;"
+          if old in s:
+              s = s.replace(old, new, 1)
+
+          # ItemCondition type
+          old = "type ViewMode = 'list' | 'grid';\n\ntype Coordinates"
+          new = "type ViewMode = 'list' | 'grid';\ntype ItemCondition = 'new_good' | 'new_defect' | 'used_good' | 'used_defect';\n\ntype Coordinates"
+          if old in s:
+              s = s.replace(old, new, 1)
+
+          # Options constant
+          anchor = "const SURFACE = '#F8F7FA';\n"
+          block = """const ITEM_CONDITIONS: { key: ItemCondition; label: string; icon: any }[] = [
+  { key: 'new_good', label: 'جديدة سليمة', icon: 'sparkles-outline' },
+  { key: 'new_defect', label: 'جديدة بها عيب', icon: 'alert-circle-outline' },
+  { key: 'used_good', label: 'مستعملة سليمة', icon: 'checkmark-circle-outline' },
+  { key: 'used_defect', label: 'مستعملة بها عيب', icon: 'warning-outline' },
+];
+
+function itemConditionLabel(value?: ItemCondition) {
+  return ITEM_CONDITIONS.find((item) => item.key === value)?.label || 'مستعملة سليمة';
+}
+"""
+          if block not in s:
+              s = s.replace(anchor, anchor + "\n" + block, 1)
+
+          # Condition dropdown component before ListingCard
+          marker = "function ListingCard({\n"
+          component = """function ItemConditionDropdown({ value, onChange }: { value?: ItemCondition; onChange: (value: ItemCondition) => void }) {
+  const [open, setOpen] = useState(false);
+  const selected = ITEM_CONDITIONS.find((item) => item.key === value);
+
+  return (
+    <View style={styles.categoryDropdownWrap}>
+      <Text style={styles.formLabel}>حالة السلعة</Text>
+      <Pressable style={[styles.categoryDropdownButton, open && styles.categoryDropdownButtonOpen]} onPress={() => setOpen((current) => !current)}>
+        <Ionicons name={open ? 'chevron-up' : 'chevron-down'} size={20} color={PURPLE} />
+        <View style={styles.categoryDropdownValue}>
+          {selected ? <Ionicons name={selected.icon} size={20} color={PURPLE} /> : null}
+          <Text style={[styles.categoryDropdownText, !selected && styles.categoryDropdownPlaceholder]}>{selected?.label || 'اختر حالة السلعة'}</Text>
+        </View>
+      </Pressable>
+      {open ? (
+        <View style={styles.categoryDropdownMenu}>
+          {ITEM_CONDITIONS.map((option, index) => {
+            const active = option.key === value;
+            return (
+              <Pressable
+                key={option.key}
+                style={[styles.categoryDropdownOption, index < ITEM_CONDITIONS.length - 1 && styles.categoryDropdownOptionBorder, active && styles.categoryDropdownOptionActive]}
+                onPress={() => { onChange(option.key); setOpen(false); }}
+              >
+                <Ionicons name={active ? 'checkmark-circle' : option.icon} size={20} color={active ? PURPLE : '#6B6572'} />
+                <Text style={[styles.categoryDropdownOptionText, active && styles.categoryDropdownOptionTextActive]}>{option.label}</Text>
+              </Pressable>
+            );
+          })}
+        </View>
+      ) : null}
+    </View>
+  );
+}
+
+"""
+          if component not in s:
+              if marker not in s:
+                  raise SystemExit('ListingCard marker not found')
+              s = s.replace(marker, component + marker, 1)
+
+          # Create state
+          old = "  const [description, setDescription] = useState('');\n  const [city, setCity] = useState('');"
+          new = "  const [description, setDescription] = useState('');\n  const [itemCondition, setItemCondition] = useState<ItemCondition>();\n  const [city, setCity] = useState('');"
+          if old in s:
+              s = s.replace(old, new, 1)
+
+          # Create validation
+          old = "if (!categoryId || !title.trim() || !description.trim() || !city.trim()) {\n      return Alert.alert('بيانات ناقصة', 'أكمل التصنيف والعنوان والوصف والمدينة.');"
+          new = "if (!categoryId || !itemCondition || !title.trim() || !description.trim() || !city.trim()) {\n      return Alert.alert('بيانات ناقصة', 'أكمل التصنيف وحالة السلعة والعنوان والوصف والمدينة.');"
+          if old in s:
+              s = s.replace(old, new, 1)
+
+          # Create payload - first occurrence only
+          old = "          description: description.trim(),\n          city: city.trim(),"
+          new = "          description: description.trim(),\n          item_condition: itemCondition,\n          city: city.trim(),"
+          if old in s:
+              s = s.replace(old, new, 1)
+
+          # Create dropdown
+          old = "      <CategoryDropdown categories={categories} value={categoryId} onChange={setCategoryId} />\n\n      <TextInput style={styles.input} value={title}"
+          new = "      <CategoryDropdown categories={categories} value={categoryId} onChange={setCategoryId} />\n      <ItemConditionDropdown value={itemCondition} onChange={setItemCondition} />\n\n      <TextInput style={styles.input} value={title}"
+          if old in s:
+              s = s.replace(old, new, 1)
+
+          # Edit state
+          old = "  const [description, setDescription] = useState(listing.description || '');\n  const [city, setCity] = useState(listing.city || '');"
+          new = "  const [description, setDescription] = useState(listing.description || '');\n  const [itemCondition, setItemCondition] = useState<ItemCondition>(listing.item_condition || 'used_good');\n  const [city, setCity] = useState(listing.city || '');"
+          if old in s:
+              s = s.replace(old, new, 1)
+
+          # Edit payload: replace remaining description/city pair
+          old = "          description: description.trim(),\n          city: city.trim(),"
+          new = "          description: description.trim(),\n          item_condition: itemCondition,\n          city: city.trim(),"
+          if old in s:
+              s = s.replace(old, new, 1)
+
+          # Edit dropdown
+          old = "      <CategoryDropdown categories={categories} value={categoryId} onChange={setCategoryId} />\n\n      <Text style={styles.formLabel}>حالة الإعلان</Text>"
+          new = "      <CategoryDropdown categories={categories} value={categoryId} onChange={setCategoryId} />\n      <ItemConditionDropdown value={itemCondition} onChange={setItemCondition} />\n\n      <Text style={styles.formLabel}>حالة الإعلان</Text>"
+          if old in s:
+              s = s.replace(old, new, 1)
+
+          # Detail display after free label
+          old = "            <Text style={styles.detailPrice}>مجانا</Text>\n            <View style={styles.detailMetaLine}><Text style={styles.detailMetaText}>{detail.city}</Text>"
+          new = """            <Text style={styles.detailPrice}>مجانا</Text>
+            <View style={{ alignSelf: 'flex-end', flexDirection: 'row-reverse', alignItems: 'center', gap: 6, backgroundColor: PURPLE_LIGHT, borderRadius: 12, paddingHorizontal: 11, paddingVertical: 7, marginBottom: 10 }}>
+              <Ionicons name={ITEM_CONDITIONS.find((x) => x.key === detail.item_condition)?.icon || 'checkmark-circle-outline'} size={17} color={PURPLE} />
+              <Text style={{ color: PURPLE_DARK, fontWeight: '900', fontSize: 12 }}>{itemConditionLabel(detail.item_condition)}</Text>
+            </View>
+            <View style={styles.detailMetaLine}><Text style={styles.detailMetaText}>{detail.city}</Text>"""
+          if old in s:
+              s = s.replace(old, new, 1)
+
+          p.write_text(s)
+          PY
+
+      - name: Validate mobile
+        run: |
+          cd mobile
+          npm install --no-audit --no-fund
+          npx tsc --noEmit
+          git checkout -- package-lock.json 2>/dev/null || true
+
+      - name: Commit mobile changes
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add mobile/App.tsx
+          git commit -m 'Add listing item condition dropdown' || exit 0
+          git push origin main
+
+      - name: Restart Expo
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh workflow run start-expo.yml --repo Bafageeh/used --ref main
