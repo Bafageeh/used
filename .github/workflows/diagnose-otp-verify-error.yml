@@ -1,0 +1,43 @@
+name: Diagnose OTP Verify Error
+
+on:
+  push:
+    paths:
+      - ".github/workflows/diagnose-otp-verify-error.yml"
+  workflow_dispatch:
+
+jobs:
+  diagnose:
+    runs-on: ubuntu-latest
+    environment: production
+    steps:
+      - name: Configure SSH
+        env:
+          SERVER_SSH_KEY: ${{ secrets.SERVER_SSH_KEY }}
+          SERVER_HOST: ${{ secrets.SERVER_HOST }}
+          SERVER_PORT: ${{ secrets.SERVER_PORT }}
+        run: |
+          install -m 700 -d ~/.ssh
+          printf '%s\n' "$SERVER_SSH_KEY" > ~/.ssh/used_api_key
+          chmod 600 ~/.ssh/used_api_key
+          ssh-keyscan -p "$SERVER_PORT" -H "$SERVER_HOST" >> ~/.ssh/known_hosts
+
+      - name: Inspect recent verify failure
+        env:
+          SERVER_HOST: ${{ secrets.SERVER_HOST }}
+          SERVER_PORT: ${{ secrets.SERVER_PORT }}
+          SERVER_USER: ${{ secrets.SERVER_USER }}
+          DEPLOY_PATH: ${{ secrets.DEPLOY_PATH }}
+        run: |
+          ssh -i ~/.ssh/used_api_key -p "$SERVER_PORT" "$SERVER_USER@$SERVER_HOST" "bash -s" <<'REMOTE'
+          set -eu
+          cd '${{ secrets.DEPLOY_PATH }}/api'
+          echo '--- RECENT ERRORS ---'
+          tail -n 220 storage/logs/laravel.log | grep -E 'production.ERROR|SQLSTATE|verifyOtp|Integrity constraint|doesn.t have a default value|Column not found|MassAssignment|Undefined|Call to' | tail -n 100 || true
+          echo '--- USERS COLUMNS ---'
+          php artisan tinker --execute="echo implode(',', Illuminate\\Support\\Facades\\Schema::getColumnListing('users'));" 2>/dev/null || true
+          echo
+          echo '--- LATEST REGISTER OTP STATUS ---'
+          php artisan tinker --execute="\$o=App\\Models\\OtpCode::where('purpose','register')->latest()->first(); if(\$o){ echo 'exists=1 verified='.(\$o->verified_at?'1':'0').' attempts='.\$o->attempts.' expired='.(\$o->expires_at->isPast()?'1':'0'); } else { echo 'exists=0'; }" 2>/dev/null || true
+          echo
+          REMOTE
