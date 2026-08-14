@@ -3,6 +3,7 @@
 use App\Http\Controllers\Api\AdminController;
 use App\Http\Controllers\Api\AuthController;
 use App\Http\Controllers\Api\CategoryController;
+use App\Http\Controllers\Api\ConversationController;
 use App\Http\Controllers\Api\ListingController;
 use App\Http\Controllers\Api\ListingImageController;
 use App\Http\Controllers\Api\ListingVideoController;
@@ -25,6 +26,13 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::delete('/listing-images/{image}',[ListingImageController::class,'destroy']);
     Route::post('/listings/{listing}/video',[ListingVideoController::class,'store']);
     Route::delete('/listings/{listing}/video',[ListingVideoController::class,'destroy']);
+
+    Route::get('/conversations',[ConversationController::class,'index']);
+    Route::post('/listings/{listing}/conversation',[ConversationController::class,'start']);
+    Route::get('/conversations/{conversation}/messages',[ConversationController::class,'messages']);
+    Route::post('/conversations/{conversation}/messages',[ConversationController::class,'send']);
+    Route::get('/messages/unread-count',[ConversationController::class,'unreadCount']);
+    Route::get('/message-notifications',[ConversationController::class,'notifications']);
 
     Route::prefix('admin')->group(function () {
         Route::get('/dashboard',[AdminController::class,'dashboard']);
