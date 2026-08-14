@@ -21,24 +21,22 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 20.19.4
-          cache: npm
-          cache-dependency-path: mobile/package-lock.json
 
-      - name: Align dependencies to Expo SDK 54
+      - name: Build clean Expo SDK 54 dependency set
         working-directory: mobile
         run: |
-          npm install expo@~54.0.0 --save
-          npx expo install --fix
+          rm -rf node_modules package-lock.json
+          npm install
           npx expo-doctor@latest
 
-      - name: Commit aligned dependencies
+      - name: Commit clean SDK 54 lockfile
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add mobile/package.json mobile/package-lock.json mobile/app.json
+          git add mobile/package.json mobile/package-lock.json
           if git diff --cached --quiet; then
             echo "No dependency changes to commit"
           else
-            git commit -m "Align Used mobile with Expo SDK 54 for physical Expo Go"
+            git commit -m "Generate clean Expo SDK 54 dependencies for Used"
             git push origin HEAD:main
           fi
