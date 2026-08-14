@@ -61,21 +61,89 @@ jobs:
           # Backward compatibility: old accounts used the password column for the numeric PIN.
           php artisan tinker --execute="Illuminate\\Support\\Facades\\DB::table('users')->whereNull('pin')->whereNotNull('password')->update(['pin' => Illuminate\\Support\\Facades\\DB::raw('password')]);"
 
-          # Keep the local background-removal service alive across API deployments.
+          # Keep the local background-removal + tight-crop service alive across API deployments.
           VENV="$API_PATH/storage/rembg-venv"
-          if [ -x "$VENV/bin/rembg" ]; then
+          if [ -x "$VENV/bin/python" ] && [ -f "$API_PATH/bin/rembg_service.py" ]; then
+            "$VENV/bin/pip" install -q fastapi uvicorn python-multipart pillow
             if [ -f storage/rembg.pid ]; then
               oldpid=$(cat storage/rembg.pid 2>/dev/null || true)
               [ -z "${oldpid:-}" ] || kill "$oldpid" 2>/dev/null || true
             fi
             pkill -f 'rembg s.*127.0.0.1.*8092' 2>/dev/null || true
+            pkill -f 'uvicorn rembg_service:app.*8092' 2>/dev/null || true
             sleep 1
             mkdir -p storage/rembg-models storage/logs
-            nohup env U2NET_HOME="$API_PATH/storage/rembg-models" OMP_NUM_THREADS=2 "$VENV/bin/rembg" s --host 127.0.0.1 --port 8092 --no-ui > "$API_PATH/storage/logs/rembg.log" 2>&1 < /dev/null &
+            nohup env U2NET_HOME="$API_PATH/storage/rembg-models" OMP_NUM_THREADS=2 \
+              "$VENV/bin/python" -m uvicorn rembg_service:app --app-dir "$API_PATH/bin" --host 127.0.0.1 --port 8092 \
+              > "$API_PATH/storage/logs/rembg.log" 2>&1 < /dev/null &
             echo $! > storage/rembg.pid
-            echo 'REMBG_RESTARTED=YES'
+
+            READY=0
+            for i in $(seq 1 30); do
+              sleep 2
+              if curl -fsS --max-time 3 http://127.0.0.1:8092/api >/dev/null 2>&1; then
+                READY=1
+                break
+              fi
+            done
+            if [ "$READY" = 1 ]; then
+              echo 'REMBG_TIGHT_CROP=READY'
+            else
+              echo 'REMBG_TIGHT_CROP=FAILED'
+              tail -n 120 storage/logs/rembg.log || true
+              exit 5
+            fi
           else
-            echo 'REMBG_RESTARTED=NO (service is not installed yet)'
+            echo 'REMBG_TIGHT_CROP=NOT_INSTALLED'
+          fi
+
+          # Reprocess existing listing images once so current listings also lose empty transparent margins.
+          if [ -x "$VENV/bin/python" ] && [ ! -f storage/.tight-crop-v1-done ]; then
+            php <<'PHP'
+          <?php
+          require 'vendor/autoload.php';
+          $app = require 'bootstrap/app.php';
+          $app->make(Illuminate\Contracts\Console\Kernel::class)->bootstrap();
+
+          $disk = Illuminate\Support\Facades\Storage::disk('public');
+          $done = 0;
+          $failed = 0;
+
+          foreach (App\Models\ListingImage::query()->whereNotNull('path')->cursor() as $image) {
+              try {
+                  $source = $disk->path($image->path);
+                  if (!is_file($source)) {
+                      $failed++;
+                      continue;
+                  }
+
+                  $response = Illuminate\Support\Facades\Http::connectTimeout(3)
+                      ->timeout(180)
+                      ->attach('file', file_get_contents($source), basename($source))
+                      ->post('http://127.0.0.1:8092/api/remove');
+
+                  if (!$response->successful() || strlen($response->body()) < 100) {
+                      $failed++;
+                      continue;
+                  }
+
+                  $processed = $image->processed_path
+                      ?: 'listings/'.$image->listing_id.'/processed/'.Illuminate\Support\Str::uuid().'.png';
+                  $disk->put($processed, $response->body());
+                  $image->forceFill([
+                      'processed_path' => $processed,
+                      'processing_status' => 'done',
+                      'processed_at' => now(),
+                  ])->save();
+                  $done++;
+              } catch (Throwable $e) {
+                  $failed++;
+              }
+          }
+
+          echo "TIGHT_CROP_EXISTING_DONE={$done} FAILED={$failed}\n";
+          PHP
+            touch storage/.tight-crop-v1-done
           fi
 
           php artisan config:cache
