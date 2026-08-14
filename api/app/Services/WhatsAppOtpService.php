@@ -12,6 +12,8 @@ class WhatsAppOtpService
         $token = config('marketplace.whatsapp.token');
         $phoneNumberId = config('marketplace.whatsapp.phone_number_id');
         $template = config('marketplace.whatsapp.template', 'verify_code');
+        $language = config('marketplace.whatsapp.language', 'ar');
+        $graphVersion = config('marketplace.whatsapp.graph_version', 'v23.0');
 
         if (!$token || !$phoneNumberId) {
             if (app()->environment('local', 'testing')) {
@@ -23,17 +25,29 @@ class WhatsAppOtpService
 
         $response = Http::withToken($token)
             ->timeout(15)
-            ->post("https://graph.facebook.com/v23.0/{$phoneNumberId}/messages", [
+            ->post("https://graph.facebook.com/{$graphVersion}/{$phoneNumberId}/messages", [
                 'messaging_product' => 'whatsapp',
                 'to' => $phone,
                 'type' => 'template',
                 'template' => [
                     'name' => $template,
-                    'language' => ['code' => 'ar'],
-                    'components' => [[
-                        'type' => 'body',
-                        'parameters' => [['type' => 'text', 'text' => $code]],
-                    ]],
+                    'language' => ['code' => $language],
+                    'components' => [
+                        [
+                            'type' => 'body',
+                            'parameters' => [
+                                ['type' => 'text', 'text' => $code],
+                            ],
+                        ],
+                        [
+                            'type' => 'button',
+                            'sub_type' => 'url',
+                            'index' => '0',
+                            'parameters' => [
+                                ['type' => 'text', 'text' => $code],
+                            ],
+                        ],
+                    ],
                 ],
             ]);
 
