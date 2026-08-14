@@ -21,7 +21,7 @@ import * as SecureStore from 'expo-secure-store';
 import AdminPanel from './AdminPanel';
 
 type Category = { id: number; name: string; slug?: string };
-type ListingImage = { id: number; url?: string; path?: string };
+type ListingImage = { id: number; url?: string; path?: string; original_url?: string; processed_url?: string | null; processing_status?: string };
 type User = { id: number; name: string; phone?: string | null; username?: string | null; role?: string };
 type Listing = {
   id: number;
@@ -275,7 +275,7 @@ function ListingCard({
   return (
     <Pressable style={[styles.card, compact && styles.cardGrid]} onPress={onPress}>
       <View style={[styles.cardImageWrap, compact && styles.cardImageWrapGrid]}>
-        {uri ? <Image source={{ uri }} style={[styles.cardImage, compact && styles.cardImageGrid]} resizeMode="cover" /> : (
+        {uri ? <Image source={{ uri }} style={[styles.cardImage, compact && styles.cardImageGrid]} resizeMode={item.images?.[0]?.processed_url ? 'contain' : 'cover'} /> : (
           <View style={styles.noImageBox}>
             <Ionicons name="image-outline" size={32} color="#B2A9BF" />
             <Text style={styles.noImage}>لا توجد صورة</Text>
@@ -490,6 +490,7 @@ function CreateListing({ categories, token, onPublished }: { categories: Categor
           <Pressable style={styles.mediaActionButton} onPress={chooseImages}><Ionicons name="images-outline" size={21} color={PURPLE} /><Text style={styles.mediaActionText}>من الألبوم</Text></Pressable>
           <Pressable style={styles.mediaActionButton} onPress={takePhoto}><Ionicons name="camera-outline" size={21} color={PURPLE} /><Text style={styles.mediaActionText}>تصوير مباشر</Text></Pressable>
         </View>
+        <Text style={{ color: MUTED, fontSize: 11, textAlign: 'right', marginTop: 5 }}>تُزال خلفية الصور تلقائيًا مع الاحتفاظ بالصورة الأصلية.</Text>
         <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.previewRow}>
           {images.map((asset, index) => (
             <View key={`${asset.assetId || asset.uri}-${index}`} style={styles.previewWrap}>
@@ -1118,7 +1119,7 @@ export default function App() {
         <ScrollView contentContainerStyle={styles.detailPage}>
           {photos.length ? (
             <ScrollView horizontal pagingEnabled showsHorizontalScrollIndicator={false} style={styles.gallery}>
-              {photos.map((photo) => <Image key={photo.id} source={{ uri: imageUrl(photo) }} style={styles.detailImage} resizeMode="cover" />)}
+              {photos.map((photo) => <Image key={photo.id} source={{ uri: imageUrl(photo) }} style={styles.detailImage} resizeMode={photo.processed_url ? 'contain' : 'cover'} />)}
             </ScrollView>
           ) : <View style={styles.detailNoImage}><Ionicons name="images-outline" size={48} color="#B2A9BF" /><Text style={styles.noImage}>لا توجد صور</Text></View>}
           {photos.length > 1 ? <Text style={styles.photoCount}>{photos.length} صور • اسحب للتنقل</Text> : null}
@@ -1435,7 +1436,7 @@ const styles = StyleSheet.create({
 
   card: { marginHorizontal: 12, marginBottom: 10, height: 158, backgroundColor: '#fff', borderRadius: 18, borderWidth: 1, borderColor: BORDER, flexDirection: 'row', overflow: 'hidden', shadowColor: '#1D102D', shadowOpacity: 0.05, shadowRadius: 8, shadowOffset: { width: 0, height: 2 }, elevation: 2 },
   cardGrid: { width: '47.8%', marginHorizontal: 0, height: 288, flexDirection: 'column' },
-  cardImageWrap: { width: '42%', height: 158, backgroundColor: '#EEEAF2', position: 'relative', overflow: 'hidden' },
+  cardImageWrap: { width: '42%', height: 158, backgroundColor: '#FAFAFA', position: 'relative', overflow: 'hidden' },
   cardImageWrapGrid: { width: '100%', height: 142, minHeight: 142 },
   cardImage: { width: '100%', height: 158 },
   cardImageGrid: { height: 142 },
@@ -1544,8 +1545,8 @@ const styles = StyleSheet.create({
   detailBarTitle: { color: '#fff', fontSize: 18, fontWeight: '900' },
   detailFavorite: { width: 38, height: 38, alignItems: 'center', justifyContent: 'center' },
   detailPage: { paddingBottom: 30, backgroundColor: SURFACE },
-  gallery: { width: '100%', backgroundColor: '#EDE8F3' },
-  detailImage: { width: 390, height: 310, backgroundColor: '#EDE8F3' },
+  gallery: { width: '100%', backgroundColor: '#FAFAFA' },
+  detailImage: { width: 390, height: 310, backgroundColor: '#FAFAFA' },
   detailNoImage: { height: 280, alignItems: 'center', justifyContent: 'center', gap: 8, backgroundColor: '#ECE8F0' },
   photoCount: { textAlign: 'center', color: MUTED, paddingVertical: 8, fontSize: 12 },
   detailBody: { margin: 12, padding: 17, borderRadius: 18, backgroundColor: '#fff', alignItems: 'flex-end', borderWidth: 1, borderColor: BORDER },
