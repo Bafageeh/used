@@ -9,6 +9,7 @@ use App\Models\Listing;
 use App\Models\User;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
 
 class AdminController extends Controller
@@ -107,17 +108,63 @@ class AdminController extends Controller
         return response()->noContent();
     }
 
+
+    private function categorySlug(string $name, ?int $ignoreId = null): string
+    {
+        $name = trim($name);
+        $known = [
+            'جوالات' => 'mobile',
+            'جوالات وأجهزة' => 'electronics',
+            'هواتف وجوالات' => 'mobile-phones',
+            'أجهزة' => 'electronics',
+            'إلكترونيات' => 'electronics',
+            'سيارات' => 'cars',
+            'سيارات ومركبات' => 'vehicles',
+            'مركبات' => 'vehicles',
+            'عقار' => 'real-estate',
+            'عقارات' => 'real-estate',
+            'أثاث' => 'furniture',
+            'أثاث ومستلزمات منزلية' => 'home-furniture',
+            'مستلزمات منزلية' => 'home-supplies',
+            'خدمات' => 'services',
+            'أزياء' => 'fashion',
+            'ملابس' => 'clothing',
+            'حيوانات' => 'pets',
+            'طيور' => 'birds',
+            'رياضة' => 'sports',
+            'ألعاب' => 'games',
+            'كتب' => 'books',
+            'أطفال' => 'kids',
+            'مقتنيات' => 'collectibles',
+            'أخرى' => 'other',
+        ];
+
+        $base = $known[$name] ?? Str::slug($name);
+        if ($base === '') $base = 'category';
+
+        $slug = $base;
+        $suffix = 2;
+        while (true) {
+            $query = Category::where('slug', $slug);
+            if ($ignoreId !== null) $query->where('id', '!=', $ignoreId);
+            if (!$query->exists()) return $slug;
+            $slug = $base.'-'.$suffix++;
+        }
+    }
+
     public function storeCategory(Request $request)
     {
         $this->authorizeAdmin($request);
-        $data=$request->validate(['name'=>['required','string','max:80'],'slug'=>['required','alpha_dash','max:100','unique:categories'],'icon'=>['nullable','string','max:50'],'parent_id'=>['nullable','exists:categories,id'],'sort_order'=>['nullable','integer','min:0'],'is_active'=>['sometimes','boolean']]);
+        $data=$request->validate(['name'=>['required','string','max:80'],'icon'=>['nullable','string','max:50'],'parent_id'=>['nullable','exists:categories,id'],'sort_order'=>['nullable','integer','min:0'],'is_active'=>['sometimes','boolean']]);
+        $data['slug']=$this->categorySlug($data['name']);
         return response()->json(Category::create($data),201);
     }
 
     public function updateCategory(Request $request, Category $category)
     {
         $this->authorizeAdmin($request);
-        $data=$request->validate(['name'=>['sometimes','string','max:80'],'slug'=>['sometimes','alpha_dash','max:100',Rule::unique('categories','slug')->ignore($category->id)],'icon'=>['sometimes','nullable','string','max:50'],'sort_order'=>['sometimes','integer','min:0'],'is_active'=>['sometimes','boolean']]);
+        $data=$request->validate(['name'=>['sometimes','string','max:80'],'icon'=>['sometimes','nullable','string','max:50'],'sort_order'=>['sometimes','integer','min:0'],'is_active'=>['sometimes','boolean']]);
+        if (array_key_exists('name',$data)) $data['slug']=$this->categorySlug($data['name'],$category->id);
         $category->update($data); return $category;
     }
 
