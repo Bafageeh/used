@@ -14,9 +14,9 @@ jobs:
   dispatch:
     runs-on: ubuntu-latest
     steps:
-      - name: Build Used APK locally
+      - name: Start Used Expo workflow
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          echo "Dispatching local APK build with approved app icon"
-          gh workflow run build-apk-local.yml --repo Bafageeh/used --ref main
+          echo "Dispatching latest main to Used Expo"
+          gh workflow run start-expo.yml --repo Bafageeh/used --ref main
