@@ -50,6 +50,7 @@ class ListingController extends Controller
   abort_unless($request->user()->id===$listing->user_id,403);
   $paths=$listing->images()->pluck('path')->filter()->all();
   if ($paths) Storage::disk('public')->delete($paths);
+  if ($listing->video_path) Storage::disk('public')->delete($listing->video_path);
   Storage::disk('public')->deleteDirectory("listings/{$listing->id}");
   $listing->delete();
   return response()->noContent();
