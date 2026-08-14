@@ -1,0 +1,12 @@
+from pathlib import Path
+p=Path('mobile/App.tsx')
+s=p.read_text()
+s=s.replace("{item.price ? `${money.format(Number(item.price))} ر.س` : 'السعر عند التواصل'}","مجانا")
+s=s.replace("{detail.price ? `${money.format(Number(detail.price))} ر.س` : 'السعر عند التواصل'}","مجانا")
+s=s.replace("  const [price, setPrice] = useState('');\n","")
+s=s.replace("  const [price, setPrice] = useState(listing.price == null ? '' : String(listing.price));\n","")
+s=s.replace("          price: price.trim() || null,\n","")
+s=s.replace("      <TextInput style={styles.input} value={price} onChangeText={setPrice} placeholder=\"السعر (اختياري)\" keyboardType=\"decimal-pad\" textAlign=\"right\" />\n","")
+s=s.replace("type SortMode = 'new' | 'price-low' | 'price-high';","type SortMode = 'new';")
+p.write_text(s)
+print('FREE_PATCH_OK')
