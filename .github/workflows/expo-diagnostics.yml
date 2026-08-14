@@ -31,7 +31,7 @@ jobs:
           DEPLOY_PATH: ${{ secrets.DEPLOY_PATH }}
         run: |
           ssh -i ~/.ssh/used_diag_key -p "$SERVER_PORT" "$SERVER_USER@$SERVER_HOST" "
-            MOBILE_PATH=\$(dirname '$DEPLOY_PATH')/mobile
+            MOBILE_PATH='$DEPLOY_PATH/mobile'
             cd \"\$MOBILE_PATH\" || exit 1
             echo '--- LOCATION ---'
             pwd
@@ -47,9 +47,9 @@ jobs:
             npx expo-doctor@latest || true
             echo '--- ERRORS ---'
             if [ -f expo.log ]; then
-              sed -r 's/\x1B\[[0-9;?]*[ -\/]*[@-~]//g' expo.log | grep -Ei 'error|exception|fatal|invariant|typeerror|referenceerror|addViewAt|fabric|crash|failed' | tail -n 160 || true
+              sed -r 's/\x1B\[[0-9;?]*[ -\/]*[@-~]//g' expo.log | grep -Ei 'error|exception|fatal|invariant|typeerror|referenceerror|addViewAt|fabric|crash|failed|warning' | tail -n 220 || true
               echo '--- LAST LOG ---'
-              sed -r 's/\x1B\[[0-9;?]*[ -\/]*[@-~]//g' expo.log | tail -n 220 || true
+              sed -r 's/\x1B\[[0-9;?]*[ -\/]*[@-~]//g' expo.log | tail -n 320 || true
             else
               echo 'expo.log missing'
             fi
