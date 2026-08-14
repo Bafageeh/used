@@ -46,7 +46,7 @@ jobs:
             cd \"\$MOBILE_PATH\"
             if [ -f package-lock.json ]; then npm ci; else npm install; fi"
 
-      - name: Start Expo in background
+      - name: Start Expo in background with TTY logging
         env:
           SERVER_HOST: ${{ secrets.SERVER_HOST }}
           SERVER_PORT: ${{ secrets.SERVER_PORT }}
@@ -62,12 +62,16 @@ jobs:
             fi
             if command -v fuser >/dev/null 2>&1; then fuser -k 8091/tcp 2>/dev/null || true; fi
             rm -f expo.log expo.pid
-            nohup npx expo start --clear --go --tunnel --port 8091 > \"\$MOBILE_PATH/expo.log\" 2>&1 < /dev/null &
+            if command -v script >/dev/null 2>&1; then
+              nohup script -q -f -c 'npx expo start --clear --go --tunnel --port 8091' \"\$MOBILE_PATH/expo.log\" > /dev/null 2>&1 < /dev/null &
+            else
+              nohup npx expo start --clear --go --tunnel --port 8091 > \"\$MOBILE_PATH/expo.log\" 2>&1 < /dev/null &
+            fi
             NEW_PID=\$!
             echo \"\$NEW_PID\" > \"\$MOBILE_PATH/expo.pid\"
-            echo \"Started Expo PID \$NEW_PID\"
+            echo \"Started Expo wrapper PID \$NEW_PID\"
           "
-          sleep 30
+          sleep 35
 
       - name: Verify Expo and print test URL
         env:
@@ -79,18 +83,15 @@ jobs:
           ssh -i ~/.ssh/used_expo_key -p "$SERVER_PORT" "$SERVER_USER@$SERVER_HOST" "
             MOBILE_PATH=\$(dirname '$DEPLOY_PATH')/mobile
             cd \"\$MOBILE_PATH\"
+            CLEAN_LOG=\$(mktemp)
+            sed -r 's/\x1B\[[0-9;?]*[ -\/]*[@-~]//g' expo.log > \"\$CLEAN_LOG\" 2>/dev/null || cp expo.log \"\$CLEAN_LOG\"
             echo '--- EXPO PROCESS ---'
-            if [ -f expo.pid ] && kill -0 \$(cat expo.pid) 2>/dev/null; then echo RUNNING; else echo NOT_RUNNING; fi
-            echo '--- EXPO URL FROM LOG ---'
-            grep -Eo 'https://[A-Za-z0-9.-]+\.exp\.direct' expo.log | tail -n 1 || true
-            echo '--- TUNNEL API ---'
-            TUNNELS=\$(curl -fsS http://127.0.0.1:4040/api/tunnels 2>/dev/null || true)
-            printf '%s\n' \"\$TUNNELS\"
-            printf '%s\n' \"\$TUNNELS\" | grep -Eo 'https://[^\" ]+' | head -n 5 || true
-            echo '--- EXPO PROCESSES ---'
-            ps -ef | grep -E '[e]xpo|[n]grok|8091' | tail -n 20 || true
-            echo '--- LOCAL SERVER HEADERS ---'
-            curl -sSI http://127.0.0.1:8091 2>/dev/null | head -n 20 || true
+            if curl -fsS http://127.0.0.1:8091 >/dev/null 2>&1; then echo RUNNING; else echo NOT_RUNNING; fi
+            echo '--- EXPO TEST URLS ---'
+            grep -Eo '(exp|https?)://[^[:space:]]+' \"\$CLEAN_LOG\" | grep -E 'exp\.direct|exp://' | tail -n 10 || true
+            echo '--- TUNNEL / QR LINES ---'
+            grep -Ei 'waiting on|scan|expo go|tunnel|exp\.direct|exp://' \"\$CLEAN_LOG\" | tail -n 40 || true
             echo '--- LAST LOG LINES ---'
-            tail -n 100 expo.log || true
+            tail -n 120 \"\$CLEAN_LOG\" || true
+            rm -f \"\$CLEAN_LOG\"
           "
