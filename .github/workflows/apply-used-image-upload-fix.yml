@@ -1,0 +1,35 @@
+name: Apply Used Image Upload Fix
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - ".github/workflows/apply-used-image-upload-fix.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  apply:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Apply patch
+        run: python3 scripts/fix_used_legacy_upload.py
+
+      - name: Refresh lockfile and verify Expo packages
+        working-directory: mobile
+        run: |
+          rm -f package-lock.json
+          npm install --package-lock-only
+          npx expo install --check
+
+      - name: Commit and push
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add mobile/App.tsx mobile/index.ts mobile/package.json mobile/package-lock.json
+          git commit -m "Use Expo legacy multipart upload for listing images"
+          git push origin HEAD:main
