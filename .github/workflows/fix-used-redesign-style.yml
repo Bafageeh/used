@@ -1,0 +1,46 @@
+name: Fix Used Redesign Style
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - ".github/workflows/fix-used-redesign-style.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  actions: write
+
+jobs:
+  fix-validate-deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22.13.1'
+      - name: Fix StyleSheet constant
+        run: sed -i 's/StyleSheet\.absoluteFillObject/StyleSheet.absoluteFill/g' mobile/App.tsx
+      - name: Install and validate active app
+        working-directory: mobile
+        run: |
+          rm -f package-lock.json
+          npm install
+          npx tsc --noEmit
+          npx expo install --check
+          npx expo export --platform android --output-dir /tmp/used-dist
+      - name: Commit fix
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add mobile/App.tsx
+          if ! git diff --cached --quiet; then
+            git commit -m 'Fix Used redesign StyleSheet compatibility'
+            git push origin main
+          fi
+      - name: Start Expo
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh workflow run start-expo.yml --ref main
