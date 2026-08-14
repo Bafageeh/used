@@ -141,7 +141,7 @@ function ListingCard({
   return (
     <Pressable style={[styles.card, compact && styles.cardGrid]} onPress={onPress}>
       <View style={[styles.cardImageWrap, compact && styles.cardImageWrapGrid]}>
-        {uri ? <Image source={{ uri }} style={styles.cardImage} resizeMode="cover" /> : (
+        {uri ? <Image source={{ uri }} style={[styles.cardImage, compact && styles.cardImageGrid]} resizeMode="cover" /> : (
           <View style={styles.noImageBox}>
             <Ionicons name="image-outline" size={32} color="#B2A9BF" />
             <Text style={styles.noImage}>لا توجد صورة</Text>
@@ -543,7 +543,7 @@ export default function App() {
   );
 
   const storyRow = (
-    <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.storyRow}>
+    <ScrollView horizontal style={styles.storyScroller} showsHorizontalScrollIndicator={false} contentContainerStyle={styles.storyRow}>
       {categories.slice(0, 6).map((category) => {
         const sample = listings.find((x) => (x.category?.id || x.category_id) === category.id && imageUrl(x.images?.[0]));
         const sampleUri = imageUrl(sample?.images?.[0]);
@@ -564,7 +564,7 @@ export default function App() {
   );
 
   const categoryTabs = (
-    <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.categoryTabs}>
+    <ScrollView horizontal style={styles.categoryScroller} showsHorizontalScrollIndicator={false} contentContainerStyle={styles.categoryTabs}>
       <Pressable style={styles.categoryTab} onPress={() => setSelectedCategory(undefined)}>
         <Text style={[styles.categoryTabText, selectedCategory === undefined && styles.categoryTabTextActive]}>الرئيسية</Text>
         {selectedCategory === undefined ? <View style={styles.categoryUnderline} /> : null}
@@ -580,7 +580,7 @@ export default function App() {
 
   const toolbar = (
     <>
-      <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.filterRow}>
+      <ScrollView horizontal style={styles.filterScroller} showsHorizontalScrollIndicator={false} contentContainerStyle={styles.filterRow}>
         <Pressable style={[styles.filterChip, selectedCity !== 'الكل' && styles.filterChipActive]} onPress={() => { setRegionOpen((x) => !x); setFilterOpen(false); }}>
           <Ionicons name="location" size={18} color={selectedCity !== 'الكل' ? '#fff' : PURPLE} />
           <Text style={[styles.filterChipText, selectedCity !== 'الكل' && styles.filterChipTextActive]}>{selectedCity === 'الكل' ? 'كل المناطق' : selectedCity}</Text>
@@ -791,19 +791,22 @@ const styles = StyleSheet.create({
   searchInput: { flex: 1, fontSize: 15, color: TEXT, paddingVertical: 0 },
 
   homePage: { paddingBottom: 18, backgroundColor: SURFACE },
-  storyRow: { backgroundColor: '#fff', paddingHorizontal: 10, paddingTop: 14, paddingBottom: 9, gap: 13 },
+  storyScroller: { height: 101, backgroundColor: '#fff' },
+  storyRow: { minHeight: 101, backgroundColor: '#fff', paddingHorizontal: 10, paddingTop: 12, paddingBottom: 9, gap: 13, alignItems: 'flex-start' },
   storyItem: { width: 76, alignItems: 'center' },
   storyCircle: { width: 64, height: 64, borderRadius: 32, borderWidth: 2, borderColor: '#8A54E8', alignItems: 'center', justifyContent: 'center', backgroundColor: '#FAF7FF', overflow: 'hidden' },
   storyCircleActive: { borderWidth: 4, borderColor: PURPLE },
   storyImage: { width: '100%', height: '100%' },
   storyLabel: { marginTop: 6, color: '#3F3A45', fontWeight: '700', fontSize: 11, textAlign: 'center', width: 76 },
-  categoryTabs: { backgroundColor: '#fff', paddingHorizontal: 10, borderBottomWidth: 1, borderBottomColor: '#EEEAF2', minHeight: 49, alignItems: 'flex-end', gap: 4 },
+  categoryScroller: { height: 50, backgroundColor: '#fff' },
+  categoryTabs: { height: 50, backgroundColor: '#fff', paddingHorizontal: 10, borderBottomWidth: 1, borderBottomColor: '#EEEAF2', alignItems: 'flex-end', gap: 4 },
   categoryTab: { minWidth: 72, minHeight: 49, alignItems: 'center', justifyContent: 'flex-end', paddingHorizontal: 8, paddingBottom: 10, position: 'relative' },
   categoryTabText: { color: '#4B4650', fontSize: 13, fontWeight: '700' },
   categoryTabTextActive: { color: PURPLE, fontWeight: '900' },
   categoryUnderline: { position: 'absolute', bottom: 0, height: 3, borderRadius: 3, width: '75%', backgroundColor: PURPLE },
 
-  filterRow: { paddingHorizontal: 12, paddingVertical: 12, gap: 8, alignItems: 'center' },
+  filterScroller: { height: 67, backgroundColor: SURFACE },
+  filterRow: { height: 67, paddingHorizontal: 12, paddingVertical: 12, gap: 8, alignItems: 'center' },
   filterChip: { minHeight: 43, borderRadius: 12, borderWidth: 1, borderColor: '#DDD4EA', backgroundColor: '#fff', paddingHorizontal: 12, flexDirection: 'row', alignItems: 'center', gap: 6 },
   filterChipActive: { backgroundColor: PURPLE, borderColor: PURPLE },
   filterChipText: { color: PURPLE_DARK, fontSize: 12, fontWeight: '800' },
@@ -833,15 +836,16 @@ const styles = StyleSheet.create({
   listWrap: { paddingBottom: 4 },
   gridWrap: { paddingHorizontal: 10, flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'space-between' },
 
-  card: { marginHorizontal: 12, marginBottom: 10, minHeight: 154, backgroundColor: '#fff', borderRadius: 18, borderWidth: 1, borderColor: BORDER, flexDirection: 'row', overflow: 'hidden', shadowColor: '#1D102D', shadowOpacity: 0.05, shadowRadius: 8, shadowOffset: { width: 0, height: 2 }, elevation: 2 },
-  cardGrid: { width: '47.8%', marginHorizontal: 0, minHeight: 290, flexDirection: 'column' },
-  cardImageWrap: { width: '42%', minHeight: 154, backgroundColor: '#EEEAF2', position: 'relative' },
+  card: { marginHorizontal: 12, marginBottom: 10, height: 158, backgroundColor: '#fff', borderRadius: 18, borderWidth: 1, borderColor: BORDER, flexDirection: 'row', overflow: 'hidden', shadowColor: '#1D102D', shadowOpacity: 0.05, shadowRadius: 8, shadowOffset: { width: 0, height: 2 }, elevation: 2 },
+  cardGrid: { width: '47.8%', marginHorizontal: 0, height: 288, flexDirection: 'column' },
+  cardImageWrap: { width: '42%', height: 158, backgroundColor: '#EEEAF2', position: 'relative', overflow: 'hidden' },
   cardImageWrapGrid: { width: '100%', height: 142, minHeight: 142 },
-  cardImage: { width: '100%', height: '100%' },
+  cardImage: { width: '100%', height: 158 },
+  cardImageGrid: { height: 142 },
   noImageBox: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: 5 },
   noImage: { color: '#9A929F', fontSize: 11 },
   favoriteBubble: { position: 'absolute', top: 9, left: 9, width: 35, height: 35, borderRadius: 18, backgroundColor: 'rgba(255,255,255,.95)', alignItems: 'center', justifyContent: 'center', shadowColor: '#000', shadowOpacity: 0.1, shadowRadius: 5, elevation: 2 },
-  cardBody: { flex: 1, minHeight: 154, paddingHorizontal: 13, paddingVertical: 11, alignItems: 'flex-end' },
+  cardBody: { flex: 1, height: 158, paddingHorizontal: 13, paddingVertical: 11, alignItems: 'flex-end', justifyContent: 'space-between' },
   cardBodyGrid: { minHeight: 145, padding: 11 },
   cardTitle: { color: TEXT, fontSize: 16, fontWeight: '900', textAlign: 'right', lineHeight: 21 },
   cardTitleGrid: { fontSize: 14, lineHeight: 19 },
