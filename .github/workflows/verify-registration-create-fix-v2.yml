@@ -1,0 +1,83 @@
+name: Verify Registration Create Fix V2
+
+on:
+  push:
+    paths:
+      - ".github/workflows/verify-registration-create-fix-v2.yml"
+  workflow_dispatch:
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    environment: production
+    steps:
+      - name: Configure SSH
+        env:
+          SERVER_SSH_KEY: ${{ secrets.SERVER_SSH_KEY }}
+          SERVER_HOST: ${{ secrets.SERVER_HOST }}
+          SERVER_PORT: ${{ secrets.SERVER_PORT }}
+        run: |
+          install -m 700 -d ~/.ssh
+          printf '%s\n' "$SERVER_SSH_KEY" > ~/.ssh/used_api_key
+          chmod 600 ~/.ssh/used_api_key
+          ssh-keyscan -p "$SERVER_PORT" -H "$SERVER_HOST" >> ~/.ssh/known_hosts
+
+      - name: Validate registration insert and send fresh OTP
+        env:
+          SERVER_HOST: ${{ secrets.SERVER_HOST }}
+          SERVER_PORT: ${{ secrets.SERVER_PORT }}
+          SERVER_USER: ${{ secrets.SERVER_USER }}
+          DEPLOY_PATH: ${{ secrets.DEPLOY_PATH }}
+        run: |
+          set -eu
+          ssh -i ~/.ssh/used_api_key -p "$SERVER_PORT" "$SERVER_USER@$SERVER_HOST" "bash -s" <<'REMOTE' | tee /tmp/verify.txt
+          set -eu
+          cd '${{ secrets.DEPLOY_PATH }}/api'
+          grep -q "'password' => Str::random(64)" app/Http/Controllers/Api/AuthController.php
+          php <<'PHP'
+          <?php
+          require 'vendor/autoload.php';
+          $app = require 'bootstrap/app.php';
+          $app->make(Illuminate\Contracts\Console\Kernel::class)->bootstrap();
+          Illuminate\Support\Facades\DB::beginTransaction();
+          try {
+              $phone = '966599'.random_int(100000, 999999);
+              $u = App\Models\User::create([
+                  'name' => 'Registration Test',
+                  'phone' => $phone,
+                  'pin' => '4321',
+                  'password' => Illuminate\Support\Str::random(64),
+                  'role' => 'user',
+                  'is_active' => true,
+                  'phone_verified_at' => now(),
+              ]);
+              echo ($u && $u->id ? 'USER_CREATE_OK' : 'USER_CREATE_FAILED').PHP_EOL;
+          } finally {
+              Illuminate\Support\Facades\DB::rollBack();
+          }
+          PHP
+          REMOTE
+          grep -q 'USER_CREATE_OK' /tmp/verify.txt
+
+          PHONE=$(ssh -i ~/.ssh/used_api_key -p "$SERVER_PORT" "$SERVER_USER@$SERVER_HOST" "cd '$DEPLOY_PATH/api' && php artisan tinker --execute=\"echo optional(App\\Models\\OtpCode::where('purpose','register')->latest()->first())->phone;\" 2>/dev/null" | tail -n 1 | tr -d '\r\n ')
+          if ! printf '%s' "$PHONE" | grep -Eq '^9665[0-9]{8}$'; then
+            echo 'NO_RECENT_REGISTRATION_PHONE'
+            exit 0
+          fi
+
+          EXISTS=$(ssh -i ~/.ssh/used_api_key -p "$SERVER_PORT" "$SERVER_USER@$SERVER_HOST" "cd '$DEPLOY_PATH/api' && php artisan tinker --execute=\"echo App\\Models\\User::where('phone','${PHONE}')->exists() ? '1' : '0';\" 2>/dev/null" | tail -n 1 | tr -d '\r\n ')
+          if [ "$EXISTS" = "1" ]; then
+            echo 'LATEST_PHONE_ALREADY_REGISTERED=YES'
+            exit 0
+          fi
+
+          ssh -i ~/.ssh/used_api_key -p "$SERVER_PORT" "$SERVER_USER@$SERVER_HOST" "cd '$DEPLOY_PATH/api' && php artisan tinker --execute=\"App\\Models\\OtpCode::where('phone','${PHONE}')->whereNull('verified_at')->delete();\" >/dev/null 2>&1"
+          STATUS=$(curl -sS -o /tmp/otp.json -w '%{http_code}' -X POST 'https://used.pm.sa/api/auth/request-otp' \
+            -H 'Accept: application/json' \
+            -H 'Content-Type: application/json' \
+            --data "{\"phone\":\"${PHONE}\",\"purpose\":\"register\"}")
+          cat /tmp/otp.json
+          echo
+          echo "HTTP_STATUS=$STATUS"
+          test "$STATUS" = "200"
+          echo 'FRESH_OTP_SENT=YES'
