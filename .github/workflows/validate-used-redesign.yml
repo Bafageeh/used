@@ -22,8 +22,8 @@ jobs:
         with:
           node-version: '22.13.1'
 
-      - name: Apply listing item condition UI
-        run: python3 .github/scripts/apply_item_condition.py
+      - name: Apply marketplace chat UI
+        run: python3 .github/scripts/add-chat.py
 
       - name: Install dependencies
         working-directory: mobile
@@ -48,5 +48,5 @@ jobs:
           git config user.name 'github-actions[bot]'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
           git add mobile/App.tsx
-          git commit -m 'Add listing item condition dropdown' || exit 0
+          git commit -m 'Add marketplace chat and message notifications' || exit 0
           git push origin main
