@@ -1,0 +1,63 @@
+name: Check WhatsApp OTP Production
+
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - .github/workflows/check-whatsapp-otp.yml
+
+permissions:
+  contents: read
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    environment: production
+    steps:
+      - name: Configure SSH
+        env:
+          SERVER_SSH_KEY: ${{ secrets.SERVER_SSH_KEY }}
+          SERVER_HOST: ${{ secrets.SERVER_HOST }}
+          SERVER_PORT: ${{ secrets.SERVER_PORT }}
+        run: |
+          install -m 700 -d ~/.ssh
+          printf '%s\n' "$SERVER_SSH_KEY" > ~/.ssh/used_api_key
+          chmod 600 ~/.ssh/used_api_key
+          ssh-keyscan -p "$SERVER_PORT" -H "$SERVER_HOST" >> ~/.ssh/known_hosts
+
+      - name: Verify WhatsApp OTP configuration safely
+        env:
+          SERVER_HOST: ${{ secrets.SERVER_HOST }}
+          SERVER_PORT: ${{ secrets.SERVER_PORT }}
+          SERVER_USER: ${{ secrets.SERVER_USER }}
+          DEPLOY_PATH: ${{ secrets.DEPLOY_PATH }}
+        run: |
+          ssh -i ~/.ssh/used_api_key -p "$SERVER_PORT" "$SERVER_USER@$SERVER_HOST" "bash -s" <<'REMOTE'
+          set -eu
+          cd '${{ secrets.DEPLOY_PATH }}/api'
+          php artisan optimize:clear >/dev/null
+          php artisan tinker --execute="
+            \$token=(string) config('marketplace.whatsapp.token');
+            \$phoneId=(string) config('marketplace.whatsapp.phone_number_id');
+            \$template=(string) config('marketplace.whatsapp.template');
+            if (\$token==='') { fwrite(STDERR, 'WHATSAPP_TOKEN=MISSING'.PHP_EOL); exit(10); }
+            if (\$phoneId==='') { fwrite(STDERR, 'WHATSAPP_PHONE_NUMBER_ID=MISSING'.PHP_EOL); exit(11); }
+            if (\$template==='') { fwrite(STDERR, 'WHATSAPP_TEMPLATE=MISSING'.PHP_EOL); exit(12); }
+            echo 'WHATSAPP_TOKEN=SET'.PHP_EOL;
+            echo 'WHATSAPP_PHONE_NUMBER_ID=SET'.PHP_EOL;
+            echo 'WHATSAPP_TEMPLATE=SET'.PHP_EOL;
+          "
+          php artisan config:cache >/dev/null
+          echo 'WHATSAPP_OTP_CONFIG=READY'
+          REMOTE
+
+      - name: Verify public OTP endpoint contract
+        run: |
+          code=$(curl -sS -o /tmp/otp.json -w '%{http_code}' -X POST 'https://used.pm.sa/api/auth/request-otp' \
+            -H 'Accept: application/json' \
+            -H 'Content-Type: application/json' \
+            --data '{"phone":"123","purpose":"register"}')
+          cat /tmp/otp.json
+          test "$code" = "422"
+          grep -q 'phone' /tmp/otp.json
+          echo 'OTP_ENDPOINT=READY'
