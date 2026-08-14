@@ -1,21 +1,14 @@
-import { Slot } from 'expo-router';
-import { StatusBar } from 'expo-status-bar';
-import { enableScreens } from 'react-native-screens';
-import { SafeAreaProvider } from 'react-native-safe-area-context';
-import { AuthProvider } from '@/context/AuthContext';
-import { AppErrorBoundary } from '@/components/AppErrorBoundary';
-
-enableScreens(false);
+import { Text, View } from 'react-native';
 
 export default function RootLayout() {
   return (
-    <AppErrorBoundary>
-      <SafeAreaProvider>
-        <AuthProvider>
-          <StatusBar style="dark" />
-          <Slot />
-        </AuthProvider>
-      </SafeAreaProvider>
-    </AppErrorBoundary>
+    <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', padding: 24 }}>
+      <Text style={{ fontSize: 28, fontWeight: '700', textAlign: 'center' }}>
+        مستعمل مجاني
+      </Text>
+      <Text style={{ marginTop: 12, fontSize: 16, textAlign: 'center' }}>
+        اختبار تشغيل أساسي
+      </Text>
+    </View>
   );
 }
