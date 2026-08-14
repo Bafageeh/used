@@ -1,0 +1,66 @@
+name: Apply Full Admin System
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - ".github/workflows/apply-admin-system.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  actions: write
+
+jobs:
+  apply-validate-deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22.13.1
+
+      - name: Apply admin system patch
+        run: python3 .github/scripts/apply_admin_system.py
+
+      - name: Validate mobile
+        working-directory: mobile
+        run: |
+          rm -f package-lock.json
+          npm install
+          npx tsc --noEmit
+          npx expo install --check
+          npx expo export --platform android --output-dir /tmp/used-admin-dist
+
+      - name: Validate PHP syntax
+        run: |
+          if command -v php >/dev/null 2>&1; then
+            php -l api/app/Http/Controllers/Api/AuthController.php
+            php -l api/app/Http/Controllers/Api/AdminController.php
+            php -l api/app/Models/AppSetting.php
+            php -l api/database/migrations/2026_08_14_153300_create_admin_system.php
+            php -l api/routes/api.php
+          else
+            echo "PHP CLI not installed on runner; production deploy will execute Laravel validation/migrations."
+          fi
+
+      - name: Commit source changes
+        run: |
+          git checkout -- mobile/package-lock.json 2>/dev/null || rm -f mobile/package-lock.json
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add api mobile/App.tsx mobile/AdminPanel.tsx
+          git diff --cached --stat
+          git commit -m "Add full admin account and control panel"
+          git push origin main
+
+      - name: Deploy API and restart Expo
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh workflow run deploy.yml --repo Bafageeh/used --ref main
+          gh workflow run start-expo.yml --repo Bafageeh/used --ref main
+          echo "DISPATCHED_API_AND_EXPO"
