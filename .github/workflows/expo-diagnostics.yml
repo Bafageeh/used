@@ -31,7 +31,9 @@ jobs:
           DEPLOY_PATH: ${{ secrets.DEPLOY_PATH }}
         run: |
           ssh -i ~/.ssh/used_diag_key -p "$SERVER_PORT" "$SERVER_USER@$SERVER_HOST" "bash -s" <<'REMOTE'
-          MOBILE_PATH='${{ secrets.DEPLOY_PATH }}/mobile'
+          ROOT='${{ secrets.DEPLOY_PATH }}'
+          MOBILE_PATH="$ROOT/mobile"
+          API_PATH="$ROOT/api"
           cd "$MOBILE_PATH" || exit 1
           echo '--- LOCATION ---'
           pwd
@@ -55,6 +57,14 @@ jobs:
                   'images': [{'id': i.get('id'), 'path': i.get('path'), 'url': i.get('url')} for i in images[:8]],
               }, ensure_ascii=False))
           PY
+          echo '--- IMAGE FILES ON SERVER ---'
+          if [ -d "$API_PATH/storage/app/public/listings" ]; then
+            find "$API_PATH/storage/app/public/listings" -type f -printf '%P | %s bytes\n' | sort | head -n 120
+          else
+            echo 'No listings storage directory'
+          fi
+          echo '--- PUBLIC STORAGE LINK ---'
+          ls -ld "$API_PATH/public/storage" 2>/dev/null || true
           echo '--- PACKAGE VERSIONS ---'
           npm ls expo react react-native --depth=0 || true
           echo '--- ERRORS ---'
