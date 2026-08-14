@@ -47,35 +47,78 @@ jobs:
             cd \"\$MOBILE_PATH\"
             if [ -f package-lock.json ]; then npm ci; else npm install; fi"
 
-      - name: Start Expo in background with TTY logging
+      - name: Start Expo tunnel reliably
         env:
           SERVER_HOST: ${{ secrets.SERVER_HOST }}
           SERVER_PORT: ${{ secrets.SERVER_PORT }}
           SERVER_USER: ${{ secrets.SERVER_USER }}
           DEPLOY_PATH: ${{ secrets.DEPLOY_PATH }}
         run: |
-          ssh -i ~/.ssh/used_expo_key -p "$SERVER_PORT" "$SERVER_USER@$SERVER_HOST" "set -e
-            MOBILE_PATH='$DEPLOY_PATH/mobile'
-            cd \"\$MOBILE_PATH\"
+          ssh -i ~/.ssh/used_expo_key -p "$SERVER_PORT" "$SERVER_USER@$SERVER_HOST" "bash -s" <<'REMOTE'
+          set -u
+          MOBILE_PATH='${{ secrets.DEPLOY_PATH }}/mobile'
+          cd "$MOBILE_PATH" || exit 1
+
+          cleanup_used_processes() {
             if [ -f expo.pid ]; then
-              OLD_PID=\$(cat expo.pid 2>/dev/null || true)
-              if [ -n \"\$OLD_PID\" ]; then
-                pkill -TERM -P \"\$OLD_PID\" 2>/dev/null || true
-                kill \"\$OLD_PID\" 2>/dev/null || true
+              OLD_PID=$(cat expo.pid 2>/dev/null || true)
+              if [ -n "${OLD_PID:-}" ]; then
+                pkill -TERM -P "$OLD_PID" 2>/dev/null || true
+                kill "$OLD_PID" 2>/dev/null || true
               fi
             fi
-            if command -v fuser >/dev/null 2>&1; then fuser -k 8091/tcp 2>/dev/null || true; fi
-            rm -f expo.log expo.pid
-            if command -v script >/dev/null 2>&1; then
-              nohup script -q -f -c 'npx expo start --clear --go --tunnel --port 8091' \"\$MOBILE_PATH/expo.log\" > /dev/null 2>&1 < /dev/null &
-            else
-              nohup npx expo start --clear --go --tunnel --port 8091 > \"\$MOBILE_PATH/expo.log\" 2>&1 < /dev/null &
+
+            # Kill only Expo/ngrok processes whose current working directory is this Used mobile app.
+            for pid in $(pgrep -f 'expo start|ngrok' 2>/dev/null || true); do
+              cwd=$(readlink -f "/proc/$pid/cwd" 2>/dev/null || true)
+              if [ "$cwd" = "$MOBILE_PATH" ]; then
+                kill "$pid" 2>/dev/null || true
+              fi
+            done
+
+            if command -v fuser >/dev/null 2>&1; then
+              fuser -k 8091/tcp 2>/dev/null || true
             fi
-            NEW_PID=\$!
-            echo \"\$NEW_PID\" > \"\$MOBILE_PATH/expo.pid\"
-            echo \"Started Expo wrapper PID \$NEW_PID\"
-          "
-          sleep 35
+            sleep 2
+          }
+
+          cleanup_used_processes
+          rm -f expo.log expo.pid expo-attempt-*.log
+
+          for attempt in 1 2 3; do
+            echo "Starting Used Expo tunnel attempt $attempt"
+            if command -v script >/dev/null 2>&1; then
+              nohup script -q -f -c 'CI=1 npx expo start --clear --go --tunnel --port 8091' "$MOBILE_PATH/expo.log" > /dev/null 2>&1 < /dev/null &
+            else
+              nohup env CI=1 npx expo start --clear --go --tunnel --port 8091 > "$MOBILE_PATH/expo.log" 2>&1 < /dev/null &
+            fi
+            NEW_PID=$!
+            echo "$NEW_PID" > "$MOBILE_PATH/expo.pid"
+
+            for check in 1 2 3 4 5 6; do
+              sleep 5
+              if curl -fsS http://127.0.0.1:8091 >/dev/null 2>&1; then
+                echo "Expo is running on attempt $attempt, PID $NEW_PID"
+                exit 0
+              fi
+              if ! kill -0 "$NEW_PID" 2>/dev/null; then
+                break
+              fi
+            done
+
+            cp -f expo.log "expo-attempt-$attempt.log" 2>/dev/null || true
+            cleanup_used_processes
+            rm -f expo.log expo.pid
+          done
+
+          echo 'Expo tunnel failed after 3 attempts'
+          for f in expo-attempt-*.log; do
+            [ -f "$f" ] || continue
+            echo "--- $f ---"
+            tail -n 100 "$f"
+          done
+          exit 1
+          REMOTE
 
       - name: Verify Expo and print test URL
         env:
@@ -84,6 +127,7 @@ jobs:
           SERVER_USER: ${{ secrets.SERVER_USER }}
           DEPLOY_PATH: ${{ secrets.DEPLOY_PATH }}
         run: |
+          sleep 8
           ssh -i ~/.ssh/used_expo_key -p "$SERVER_PORT" "$SERVER_USER@$SERVER_HOST" "
             MOBILE_PATH='$DEPLOY_PATH/mobile'
             cd \"\$MOBILE_PATH\"
@@ -92,7 +136,7 @@ jobs:
             echo '--- EXPO LOCATION ---'
             pwd
             echo '--- EXPO PROCESS ---'
-            if curl -fsS http://127.0.0.1:8091 >/dev/null 2>&1; then echo RUNNING; else echo NOT_RUNNING; fi
+            if curl -fsS http://127.0.0.1:8091 >/dev/null 2>&1; then echo RUNNING; else echo NOT_RUNNING; exit 1; fi
             echo '--- EXPO TEST URLS ---'
             grep -Eo '(exp|https?)://[^[:space:]]+' \"\$CLEAN_LOG\" | grep -E 'exp\.direct|exp://' | tail -n 10 || true
             echo '--- TUNNEL / QR LINES ---'
@@ -101,5 +145,3 @@ jobs:
             tail -n 120 \"\$CLEAN_LOG\" || true
             rm -f \"\$CLEAN_LOG\"
           "
-
-# Restart marker after SDK alignment: 2026-08-14
