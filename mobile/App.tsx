@@ -978,7 +978,7 @@ export default function App() {
     setEditReturnDetailId(null);
     setScreen('home');
   };
-  const published = () => { setEditListing(null); setRefreshKey((x) => x + 1); setScreen('home'); };
+  const published = () => { setEditListing(null); setRefreshKey((x) => x + 1); setScreen('home'); setTimeout(() => setRefreshKey((x) => x + 1), 4000); setTimeout(() => setRefreshKey((x) => x + 1), 10000); };
   const resetFilters = () => {
     setSelectedCategory(undefined);
     setSelectedRegions([]);
