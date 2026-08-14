@@ -1,0 +1,55 @@
+name: Apply Automatic Category Slugs
+
+on:
+  push:
+    paths:
+      - '.github/workflows/apply-auto-category-slug.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  actions: write
+
+jobs:
+  apply:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Apply patch
+        run: python3 .github/scripts/auto-category-slug.py
+
+      - name: Validate mobile
+        run: |
+          cd mobile
+          npm install --no-audit --no-fund
+          npx tsc --noEmit
+          git checkout -- package-lock.json 2>/dev/null || true
+
+      - name: Validate API
+        run: php -l api/app/Http/Controllers/Api/AdminController.php
+
+      - name: Commit changes
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add mobile/AdminPanel.tsx api/app/Http/Controllers/Api/AdminController.php
+          if git diff --cached --quiet; then
+            echo 'No application changes to commit.'
+          else
+            git commit -m 'Generate category slugs automatically'
+            git push origin main
+          fi
+
+      - name: Deploy API and restart Expo
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh workflow run deploy.yml --ref main
+          gh workflow run start-expo.yml --ref main
