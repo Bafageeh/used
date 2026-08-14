@@ -59,8 +59,24 @@ jobs:
           php artisan storage:link || test -L public/storage
 
           # Backward compatibility: old accounts used the password column for the numeric PIN.
-          # Copy the existing hash once so those users can log in through the new pin endpoint.
           php artisan tinker --execute="Illuminate\\Support\\Facades\\DB::table('users')->whereNull('pin')->whereNotNull('password')->update(['pin' => Illuminate\\Support\\Facades\\DB::raw('password')]);"
+
+          # Keep the local background-removal service alive across API deployments.
+          VENV="$API_PATH/storage/rembg-venv"
+          if [ -x "$VENV/bin/rembg" ]; then
+            if [ -f storage/rembg.pid ]; then
+              oldpid=$(cat storage/rembg.pid 2>/dev/null || true)
+              [ -z "${oldpid:-}" ] || kill "$oldpid" 2>/dev/null || true
+            fi
+            pkill -f 'rembg s.*127.0.0.1.*8092' 2>/dev/null || true
+            sleep 1
+            mkdir -p storage/rembg-models storage/logs
+            nohup env U2NET_HOME="$API_PATH/storage/rembg-models" OMP_NUM_THREADS=2 "$VENV/bin/rembg" s --host 127.0.0.1 --port 8092 --no-ui > "$API_PATH/storage/logs/rembg.log" 2>&1 < /dev/null &
+            echo $! > storage/rembg.pid
+            echo 'REMBG_RESTARTED=YES'
+          else
+            echo 'REMBG_RESTARTED=NO (service is not installed yet)'
+          fi
 
           php artisan config:cache
           php artisan view:cache
