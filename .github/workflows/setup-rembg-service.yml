@@ -9,6 +9,7 @@ on:
 jobs:
   setup:
     runs-on: ubuntu-latest
+    environment: production
     steps:
       - name: Configure SSH
         env:
