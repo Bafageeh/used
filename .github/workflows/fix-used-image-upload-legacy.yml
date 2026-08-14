@@ -1,0 +1,114 @@
+name: Fix Used Image Upload Legacy
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - ".github/workflows/fix-used-image-upload-legacy.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Patch mobile to legacy FileSystem multipart upload
+        run: |
+          python3 <<'PY'
+          from pathlib import Path
+          import json
+
+          # Restore a plain Expo entry point: no global fetch/FormData monkey-patching.
+          Path('mobile/index.ts').write_text("""import { registerRootComponent } from 'expo';\nimport App from './App';\n\nregisterRootComponent(App);\n""")
+
+          pkg_path = Path('mobile/package.json')
+          pkg = json.loads(pkg_path.read_text())
+          pkg['main'] = './index.ts'
+          pkg.setdefault('dependencies', {})['expo-file-system'] = '~57.0.1'
+          pkg_path.write_text(json.dumps(pkg, ensure_ascii=False, indent=2) + '\n')
+
+          app = Path('mobile/App.tsx')
+          text = app.read_text()
+
+          anchor = "import * as ImagePicker from 'expo-image-picker';\n"
+          fs_import = "import * as FileSystem from 'expo-file-system/legacy';\n"
+          if fs_import not in text:
+              if anchor not in text:
+                  raise SystemExit('ImagePicker import anchor not found')
+              text = text.replace(anchor, anchor + fs_import, 1)
+
+          old = '''      const form = new FormData();
+      images.forEach((asset, index) => {
+        form.append('images[]', {
+          uri: asset.uri,
+          name: asset.fileName || `listing-${listing.id}-${index + 1}.jpg`,
+          type: asset.mimeType || 'image/jpeg',
+        } as any);
+      });
+      await request(`/listings/${listing.id}/images`, { method: 'POST', body: form }, token);'''
+
+          new = '''      for (const asset of images) {
+        const upload = await FileSystem.uploadAsync(
+          `${API_URL}/listings/${listing.id}/images`,
+          asset.uri,
+          {
+            httpMethod: 'POST',
+            uploadType: FileSystem.FileSystemUploadType.MULTIPART,
+            fieldName: 'images[]',
+            mimeType: asset.mimeType || 'image/jpeg',
+            headers: {
+              Accept: 'application/json',
+              Authorization: `Bearer ${token}`,
+            },
+          },
+        );
+
+        if (upload.status < 200 || upload.status >= 300) {
+          let message = `تعذر رفع الصورة (${upload.status})`;
+          try {
+            const body = JSON.parse(upload.body || '{}');
+            const errors = body?.errors
+              ? Object.values(body.errors).flat().join('، ')
+              : '';
+            message = errors || body?.message || message;
+          } catch {}
+          throw new Error(message);
+        }
+      }'''
+
+          if old not in text:
+              # In case an earlier File/expoFetch patch did reach App.tsx, replace that variant too.
+              start = text.find('      const form = new FormData();')
+              end_marker = "      Alert.alert('تم بنجاح'"
+              end = text.find(end_marker, start)
+              if start == -1 or end == -1:
+                  raise SystemExit('Upload block not found')
+              text = text[:start] + new + '\n' + text[end:]
+          else:
+              text = text.replace(old, new, 1)
+
+          # Remove modern File/fetch imports if present from an earlier attempt.
+          text = text.replace("import { fetch as expoFetch } from 'expo/fetch';\n", '')
+          text = text.replace("import { File } from 'expo-file-system';\n", '')
+
+          app.write_text(text)
+          PY
+
+      - name: Validate mobile dependencies
+        working-directory: mobile
+        run: |
+          rm -f package-lock.json
+          npm install --package-lock-only
+          npx expo install --check
+
+      - name: Commit fix
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add mobile/App.tsx mobile/index.ts mobile/package.json mobile/package-lock.json
+          git commit -m "Use legacy FileSystem multipart for listing images"
+          git push origin HEAD:main
