@@ -943,7 +943,7 @@ const styles = StyleSheet.create({
   fabActive: { backgroundColor: PURPLE_DARK },
   fabLabel: { color: '#fff', fontSize: 9, fontWeight: '900', marginTop: -4 },
 
-  menuLayer: { ...StyleSheet.absoluteFillObject, zIndex: 50, flexDirection: 'row' },
+  menuLayer: { ...StyleSheet.absoluteFill, zIndex: 50, flexDirection: 'row' },
   menuBackdrop: { flex: 1, backgroundColor: 'rgba(15,8,23,.48)' },
   sideMenu: { width: '78%', maxWidth: 310, height: '100%', backgroundColor: '#fff', paddingTop: 45, paddingHorizontal: 14, shadowColor: '#000', shadowOpacity: 0.22, shadowRadius: 14, elevation: 16 },
   sideMenuHeader: { flexDirection: 'row-reverse', alignItems: 'center', gap: 10, paddingBottom: 18 },
