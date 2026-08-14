@@ -47,7 +47,7 @@ jobs:
             cd \"\$MOBILE_PATH\"
             if [ -f package-lock.json ]; then npm ci; else npm install; fi"
 
-      - name: Start Expo tunnel reliably
+      - name: Start Expo through Cloudflare HTTPS tunnel
         env:
           SERVER_HOST: ${{ secrets.SERVER_HOST }}
           SERVER_PORT: ${{ secrets.SERVER_PORT }}
@@ -55,27 +55,26 @@ jobs:
           DEPLOY_PATH: ${{ secrets.DEPLOY_PATH }}
         run: |
           ssh -i ~/.ssh/used_expo_key -p "$SERVER_PORT" "$SERVER_USER@$SERVER_HOST" "bash -s" <<'REMOTE'
-          set -u
+          set -eu
           MOBILE_PATH='${{ secrets.DEPLOY_PATH }}/mobile'
-          cd "$MOBILE_PATH" || exit 1
+          cd "$MOBILE_PATH"
 
           cleanup_used_processes() {
-            if [ -f expo.pid ]; then
-              OLD_PID=$(cat expo.pid 2>/dev/null || true)
-              if [ -n "${OLD_PID:-}" ]; then
-                pkill -TERM -P "$OLD_PID" 2>/dev/null || true
-                kill "$OLD_PID" 2>/dev/null || true
+            for pidfile in expo.pid cloudflared.pid; do
+              if [ -f "$pidfile" ]; then
+                pid=$(cat "$pidfile" 2>/dev/null || true)
+                if [ -n "${pid:-}" ]; then
+                  pkill -TERM -P "$pid" 2>/dev/null || true
+                  kill "$pid" 2>/dev/null || true
+                fi
               fi
-            fi
-
-            # Kill only Expo/ngrok processes whose current working directory is this Used mobile app.
-            for pid in $(pgrep -f 'expo start|ngrok' 2>/dev/null || true); do
+            done
+            for pid in $(pgrep -f 'expo start|cloudflared' 2>/dev/null || true); do
               cwd=$(readlink -f "/proc/$pid/cwd" 2>/dev/null || true)
               if [ "$cwd" = "$MOBILE_PATH" ]; then
                 kill "$pid" 2>/dev/null || true
               fi
             done
-
             if command -v fuser >/dev/null 2>&1; then
               fuser -k 8091/tcp 2>/dev/null || true
             fi
@@ -83,41 +82,64 @@ jobs:
           }
 
           cleanup_used_processes
-          rm -f expo.log expo.pid expo-attempt-*.log
+          rm -f expo.log expo.pid cloudflared.log cloudflared.pid tunnel-url.txt
 
-          for attempt in 1 2 3; do
-            echo "Starting Used Expo tunnel attempt $attempt"
-            if command -v script >/dev/null 2>&1; then
-              nohup script -q -f -c 'CI=1 npx expo start --clear --go --tunnel --port 8091' "$MOBILE_PATH/expo.log" > /dev/null 2>&1 < /dev/null &
-            else
-              nohup env CI=1 npx expo start --clear --go --tunnel --port 8091 > "$MOBILE_PATH/expo.log" 2>&1 < /dev/null &
+          CF_BIN="$HOME/.local/bin/cloudflared-used"
+          mkdir -p "$HOME/.local/bin"
+          if [ ! -x "$CF_BIN" ]; then
+            arch=$(uname -m)
+            case "$arch" in
+              x86_64|amd64) asset='cloudflared-linux-amd64' ;;
+              aarch64|arm64) asset='cloudflared-linux-arm64' ;;
+              *) echo "Unsupported architecture: $arch"; exit 1 ;;
+            esac
+            curl -fL --retry 3 --retry-delay 2 "https://github.com/cloudflare/cloudflared/releases/latest/download/$asset" -o "$CF_BIN"
+            chmod +x "$CF_BIN"
+          fi
+
+          nohup "$CF_BIN" tunnel --no-autoupdate --url http://127.0.0.1:8091 > "$MOBILE_PATH/cloudflared.log" 2>&1 < /dev/null &
+          CF_PID=$!
+          echo "$CF_PID" > "$MOBILE_PATH/cloudflared.pid"
+
+          CF_URL=''
+          for i in 1 2 3 4 5 6 7 8 9 10; do
+            sleep 2
+            CF_URL=$(grep -Eo 'https://[-a-z0-9]+\.trycloudflare\.com' "$MOBILE_PATH/cloudflared.log" | tail -n 1 || true)
+            [ -n "$CF_URL" ] && break
+            kill -0 "$CF_PID" 2>/dev/null || break
+          done
+          if [ -z "$CF_URL" ]; then
+            echo 'Cloudflare tunnel URL was not created'
+            cat "$MOBILE_PATH/cloudflared.log" || true
+            exit 1
+          fi
+          echo "$CF_URL" > "$MOBILE_PATH/tunnel-url.txt"
+          echo "Cloudflare URL: $CF_URL"
+
+          if command -v script >/dev/null 2>&1; then
+            nohup script -q -f -c "CI=1 EXPO_PACKAGER_PROXY_URL=$CF_URL npx expo start --clear --go --lan --port 8091" "$MOBILE_PATH/expo.log" > /dev/null 2>&1 < /dev/null &
+          else
+            nohup env CI=1 EXPO_PACKAGER_PROXY_URL="$CF_URL" npx expo start --clear --go --lan --port 8091 > "$MOBILE_PATH/expo.log" 2>&1 < /dev/null &
+          fi
+          EXPO_PID=$!
+          echo "$EXPO_PID" > "$MOBILE_PATH/expo.pid"
+
+          for i in 1 2 3 4 5 6 7 8 9 10; do
+            sleep 3
+            if curl -fsS http://127.0.0.1:8091 >/dev/null 2>&1; then
+              echo "Expo local server is running"
+              break
             fi
-            NEW_PID=$!
-            echo "$NEW_PID" > "$MOBILE_PATH/expo.pid"
-
-            for check in 1 2 3 4 5 6; do
-              sleep 5
-              if curl -fsS http://127.0.0.1:8091 >/dev/null 2>&1; then
-                echo "Expo is running on attempt $attempt, PID $NEW_PID"
-                exit 0
-              fi
-              if ! kill -0 "$NEW_PID" 2>/dev/null; then
-                break
-              fi
-            done
-
-            cp -f expo.log "expo-attempt-$attempt.log" 2>/dev/null || true
-            cleanup_used_processes
-            rm -f expo.log expo.pid
+            kill -0 "$EXPO_PID" 2>/dev/null || break
           done
+          curl -fsS http://127.0.0.1:8091 >/dev/null
 
-          echo 'Expo tunnel failed after 3 attempts'
-          for f in expo-attempt-*.log; do
-            [ -f "$f" ] || continue
-            echo "--- $f ---"
-            tail -n 100 "$f"
-          done
-          exit 1
+          echo 'Checking public Cloudflare route...'
+          curl -fsS --retry 8 --retry-delay 2 "$CF_URL" >/dev/null
+          echo "EXPO_GO_URL=exps://${CF_URL#https://}"
+          echo '--- Expo open endpoint ---'
+          curl -fsS "$CF_URL/_expo/open?platform=android&runtime=expo" || true
+          echo
           REMOTE
 
       - name: Verify Expo and print test URL
@@ -127,21 +149,21 @@ jobs:
           SERVER_USER: ${{ secrets.SERVER_USER }}
           DEPLOY_PATH: ${{ secrets.DEPLOY_PATH }}
         run: |
-          sleep 8
           ssh -i ~/.ssh/used_expo_key -p "$SERVER_PORT" "$SERVER_USER@$SERVER_HOST" "
             MOBILE_PATH='$DEPLOY_PATH/mobile'
             cd \"\$MOBILE_PATH\"
-            CLEAN_LOG=\$(mktemp)
-            sed -r 's/\x1B\[[0-9;?]*[ -\/]*[@-~]//g' expo.log > \"\$CLEAN_LOG\" 2>/dev/null || cp expo.log \"\$CLEAN_LOG\"
-            echo '--- EXPO LOCATION ---'
-            pwd
+            CF_URL=\$(cat tunnel-url.txt 2>/dev/null || true)
             echo '--- EXPO PROCESS ---'
-            if curl -fsS http://127.0.0.1:8091 >/dev/null 2>&1; then echo RUNNING; else echo NOT_RUNNING; exit 1; fi
-            echo '--- EXPO TEST URLS ---'
-            grep -Eo '(exp|https?)://[^[:space:]]+' \"\$CLEAN_LOG\" | grep -E 'exp\.direct|exp://' | tail -n 10 || true
-            echo '--- TUNNEL / QR LINES ---'
-            grep -Ei 'waiting on|scan|expo go|tunnel|exp\.direct|exp://' \"\$CLEAN_LOG\" | tail -n 40 || true
-            echo '--- LAST LOG LINES ---'
-            tail -n 120 \"\$CLEAN_LOG\" || true
-            rm -f \"\$CLEAN_LOG\"
+            curl -fsS http://127.0.0.1:8091 >/dev/null && echo RUNNING
+            echo '--- CLOUDFLARE PROCESS ---'
+            test -n \"\$CF_URL\" && curl -fsS \"\$CF_URL\" >/dev/null && echo RUNNING
+            echo '--- EXPO GO TEST URL ---'
+            test -n \"\$CF_URL\" && echo \"exps://\${CF_URL#https://}\"
+            echo '--- OPEN ENDPOINT ---'
+            test -n \"\$CF_URL\" && curl -fsS \"\$CF_URL/_expo/open?platform=android&runtime=expo\" || true
+            echo
+            echo '--- EXPO LOG ---'
+            tail -n 120 expo.log || true
+            echo '--- CLOUDFLARE LOG ---'
+            tail -n 80 cloudflared.log || true
           "
