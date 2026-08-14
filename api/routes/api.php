@@ -5,6 +5,7 @@ use App\Http\Controllers\Api\AuthController;
 use App\Http\Controllers\Api\CategoryController;
 use App\Http\Controllers\Api\ListingController;
 use App\Http\Controllers\Api\ListingImageController;
+use App\Http\Controllers\Api\ListingVideoController;
 use Illuminate\Support\Facades\Route;
 
 Route::get('/health', fn () => response()->json(['status'=>'ok','service'=>'مستعمل مجاني']));
@@ -22,6 +23,8 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::patch('/listings/{listing}',[ListingController::class,'update']); Route::post('/listings/{listing}/refresh',[ListingController::class,'refresh']);
     Route::delete('/listings/{listing}',[ListingController::class,'destroy']); Route::post('/listings/{listing}/images',[ListingImageController::class,'store']);
     Route::delete('/listing-images/{image}',[ListingImageController::class,'destroy']);
+    Route::post('/listings/{listing}/video',[ListingVideoController::class,'store']);
+    Route::delete('/listings/{listing}/video',[ListingVideoController::class,'destroy']);
 
     Route::prefix('admin')->group(function () {
         Route::get('/dashboard',[AdminController::class,'dashboard']);
