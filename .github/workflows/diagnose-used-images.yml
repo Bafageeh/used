@@ -23,7 +23,7 @@ jobs:
           chmod 600 ~/.ssh/used_diag_key
           ssh-keyscan -p "$SERVER_PORT" -H "$SERVER_HOST" >> ~/.ssh/known_hosts
 
-      - name: Inspect image records files and public URLs
+      - name: Inspect latest upload failure
         env:
           SERVER_HOST: ${{ secrets.SERVER_HOST }}
           SERVER_PORT: ${{ secrets.SERVER_PORT }}
@@ -31,34 +31,33 @@ jobs:
           DEPLOY_PATH: ${{ secrets.DEPLOY_PATH }}
         run: |
           ssh -i ~/.ssh/used_diag_key -p "$SERVER_PORT" "$SERVER_USER@$SERVER_HOST" "bash -s" <<'REMOTE'
-          set -eu
-          cd '${{ secrets.DEPLOY_PATH }}/api'
+          set -u
+          API_PATH='${{ secrets.DEPLOY_PATH }}/api'
+          cd "$API_PATH" || exit 1
+          echo '--- LATEST LISTINGS / IMAGE COUNTS ---'
           php artisan tinker --execute="
-          foreach (Illuminate\\Support\\Facades\\DB::table('listings')->orderByDesc('id')->limit(8)->get(['id','title']) as \$l) {
+          foreach (Illuminate\\Support\\Facades\\DB::table('listings')->orderByDesc('id')->limit(8)->get(['id','title','user_id','created_at']) as \$l) {
             \$count = Illuminate\\Support\\Facades\\DB::table('listing_images')->where('listing_id', \$l->id)->count();
-            echo 'LISTING id='.\$l->id.' title='.\$l->title.' images='.\$count.PHP_EOL;
+            echo 'LISTING id='.\$l->id.' title='.\$l->title.' user='.\$l->user_id.' images='.\$count.' created='.\$l->created_at.PHP_EOL;
           }
-          foreach (Illuminate\\Support\\Facades\\DB::table('listing_images')->orderByDesc('id')->limit(12)->get(['id','listing_id','path']) as \$img) {
+          " || true
+          echo '--- LATEST IMAGE ROWS ---'
+          php artisan tinker --execute="
+          foreach (Illuminate\\Support\\Facades\\DB::table('listing_images')->orderByDesc('id')->limit(12)->get(['id','listing_id','path','sort_order']) as \$img) {
             \$exists = Illuminate\\Support\\Facades\\Storage::disk('public')->exists(\$img->path) ? 'YES' : 'NO';
             echo 'IMAGE id='.\$img->id.' listing='.\$img->listing_id.' path='.\$img->path.' file='.\$exists.PHP_EOL;
           }
-          "
-          echo '--- STORAGE LINK ---'
-          ls -ld public/storage || true
-          echo '--- STORAGE FILES ---'
-          find storage/app/public/listings -type f -printf '%P\n' 2>/dev/null | tail -n 20 || true
-          REMOTE
-
-      - name: Test latest public image URL
-        env:
-          SERVER_HOST: ${{ secrets.SERVER_HOST }}
-          SERVER_PORT: ${{ secrets.SERVER_PORT }}
-          SERVER_USER: ${{ secrets.SERVER_USER }}
-          DEPLOY_PATH: ${{ secrets.DEPLOY_PATH }}
-        run: |
-          path=$(ssh -i ~/.ssh/used_diag_key -p "$SERVER_PORT" "$SERVER_USER@$SERVER_HOST" "cd '$DEPLOY_PATH/api' && php artisan tinker --execute=\"echo optional(Illuminate\\\\Support\\\\Facades\\\\DB::table('listing_images')->orderByDesc('id')->first())->path;\"" 2>/dev/null | tr -d '\r\n')
-          echo "LATEST_PATH=$path"
-          if [ -n "$path" ]; then
-            echo '--- HEAD /storage ---'
-            curl -sS -I "https://used.pm.sa/storage/$path" | head -n 8
+          " || true
+          echo '--- STORAGE / PERMISSIONS ---'
+          id || true
+          ls -ld storage storage/app storage/app/public storage/app/public/listings storage/logs bootstrap/cache public public/storage 2>&1 || true
+          readlink -f public/storage 2>/dev/null || true
+          echo '--- LATEST LARAVEL LOG ---'
+          latest=$(ls -1t storage/logs/*.log 2>/dev/null | head -n 1 || true)
+          echo "LOG=$latest"
+          if [ -n "$latest" ]; then
+            tail -n 180 "$latest" || true
           fi
+          echo '--- DISK CONFIG ---'
+          php artisan tinker --execute="echo json_encode(config('filesystems.disks.public'), JSON_PRETTY_PRINT);" || true
+          REMOTE
