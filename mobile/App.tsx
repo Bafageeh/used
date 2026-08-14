@@ -220,6 +220,42 @@ function IconButton({ name, onPress, dark = false }: { name: any; onPress?: () =
   );
 }
 
+
+function CategoryDropdown({ categories, value, onChange }: { categories: Category[]; value?: number; onChange: (id: number) => void }) {
+  const [open, setOpen] = useState(false);
+  const selected = categories.find((category) => category.id === value);
+
+  return (
+    <View style={styles.categoryDropdownWrap}>
+      <Text style={styles.formLabel}>التصنيف</Text>
+      <Pressable style={[styles.categoryDropdownButton, open && styles.categoryDropdownButtonOpen]} onPress={() => setOpen((current) => !current)}>
+        <Ionicons name={open ? 'chevron-up' : 'chevron-down'} size={20} color={PURPLE} />
+        <View style={styles.categoryDropdownValue}>
+          {selected ? <Ionicons name={categoryIcon(selected.name) as any} size={20} color={PURPLE} /> : null}
+          <Text style={[styles.categoryDropdownText, !selected && styles.categoryDropdownPlaceholder]}>{selected?.name || 'اختر التصنيف'}</Text>
+        </View>
+      </Pressable>
+      {open ? (
+        <View style={styles.categoryDropdownMenu}>
+          {categories.map((category, index) => {
+            const active = category.id === value;
+            return (
+              <Pressable
+                key={category.id}
+                style={[styles.categoryDropdownOption, index < categories.length - 1 && styles.categoryDropdownOptionBorder, active && styles.categoryDropdownOptionActive]}
+                onPress={() => { onChange(category.id); setOpen(false); }}
+              >
+                <Ionicons name={active ? 'checkmark-circle' : categoryIcon(category.name) as any} size={20} color={active ? PURPLE : '#6B6572'} />
+                <Text style={[styles.categoryDropdownOptionText, active && styles.categoryDropdownOptionTextActive]}>{category.name}</Text>
+              </Pressable>
+            );
+          })}
+        </View>
+      ) : null}
+    </View>
+  );
+}
+
 function ListingCard({
   item,
   onPress,
@@ -448,9 +484,6 @@ function CreateListing({ categories, token, onPublished }: { categories: Categor
 
   return (
     <ScrollView contentContainerStyle={styles.formPage} keyboardShouldPersistTaps="handled">
-      <Text style={styles.sectionTitle}>أضف إعلان جديد</Text>
-      <Text style={styles.help}>صور واضحة ومعلومات دقيقة ترفع فرصة البيع.</Text>
-
       <View style={styles.formCard}>
         <View style={styles.formCardTitleRow}><Text style={styles.formCardTitle}>صور الإعلان</Text><Text style={styles.counter}>{images.length}/8</Text></View>
         <View style={styles.mediaActionRow}>
@@ -484,15 +517,7 @@ function CreateListing({ categories, token, onPublished }: { categories: Categor
         </View>
       </View>
 
-      <Text style={styles.formLabel}>التصنيف</Text>
-      <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.formCategories}>
-        {categories.map((category) => (
-          <Pressable key={category.id} style={[styles.formCategory, category.id === categoryId && styles.formCategoryActive]} onPress={() => setCategoryId(category.id)}>
-            <Ionicons name={categoryIcon(category.name) as any} size={18} color={category.id === categoryId ? '#fff' : PURPLE} />
-            <Text style={[styles.formCategoryText, category.id === categoryId && styles.formCategoryTextActive]}>{category.name}</Text>
-          </Pressable>
-        ))}
-      </ScrollView>
+      <CategoryDropdown categories={categories} value={categoryId} onChange={setCategoryId} />
 
       <TextInput style={styles.input} value={title} onChangeText={setTitle} placeholder="عنوان الإعلان" textAlign="right" />
       <TextInput style={[styles.input, styles.textarea]} value={description} onChangeText={setDescription} placeholder="اكتب وصف السلعة وحالتها بالتفصيل..." multiline textAlignVertical="top" textAlign="right" />
@@ -701,15 +726,7 @@ function EditListing({
         </View>
       </View>
 
-      <Text style={styles.formLabel}>التصنيف</Text>
-      <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.formCategories}>
-        {categories.map((category) => (
-          <Pressable key={category.id} style={[styles.formCategory, category.id === categoryId && styles.formCategoryActive]} onPress={() => setCategoryId(category.id)}>
-            <Ionicons name={categoryIcon(category.name) as any} size={18} color={category.id === categoryId ? '#fff' : PURPLE} />
-            <Text style={[styles.formCategoryText, category.id === categoryId && styles.formCategoryTextActive]}>{category.name}</Text>
-          </Pressable>
-        ))}
-      </ScrollView>
+      <CategoryDropdown categories={categories} value={categoryId} onChange={setCategoryId} />
 
       <Text style={styles.formLabel}>حالة الإعلان</Text>
       <View style={styles.statusChoiceRow}>
@@ -1479,6 +1496,18 @@ const styles = StyleSheet.create({
   formCategoryActive: { backgroundColor: PURPLE, borderColor: PURPLE },
   formCategoryText: { color: PURPLE_DARK, fontSize: 12, fontWeight: '800' },
   formCategoryTextActive: { color: '#fff' },
+  categoryDropdownWrap: { marginBottom: 12, position: 'relative', zIndex: 12 },
+  categoryDropdownButton: { minHeight: 54, borderRadius: 15, borderWidth: 1.2, borderColor: '#D8C8EB', backgroundColor: '#fff', paddingHorizontal: 16, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+  categoryDropdownButtonOpen: { borderColor: PURPLE, borderBottomLeftRadius: 8, borderBottomRightRadius: 8 },
+  categoryDropdownValue: { flex: 1, flexDirection: 'row-reverse', alignItems: 'center', gap: 9 },
+  categoryDropdownText: { flex: 1, color: TEXT, fontSize: 15, fontWeight: '800', textAlign: 'right' },
+  categoryDropdownPlaceholder: { color: MUTED, fontWeight: '600' },
+  categoryDropdownMenu: { marginTop: 6, borderRadius: 14, borderWidth: 1, borderColor: '#D8C8EB', backgroundColor: '#fff', overflow: 'hidden', shadowColor: '#28143F', shadowOpacity: 0.12, shadowRadius: 8, shadowOffset: { width: 0, height: 3 }, elevation: 6 },
+  categoryDropdownOption: { minHeight: 52, paddingHorizontal: 16, flexDirection: 'row-reverse', alignItems: 'center', gap: 10, backgroundColor: '#fff' },
+  categoryDropdownOptionBorder: { borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: '#E7E2EF' },
+  categoryDropdownOptionActive: { backgroundColor: PURPLE_LIGHT },
+  categoryDropdownOptionText: { flex: 1, color: TEXT, fontSize: 14, fontWeight: '700', textAlign: 'right' },
+  categoryDropdownOptionTextActive: { color: PURPLE_DARK, fontWeight: '900' },
   locationButton: { minHeight: 50, borderRadius: 14, backgroundColor: PURPLE_LIGHT, borderWidth: 1, borderColor: '#D9C5F5', flexDirection: 'row-reverse', alignItems: 'center', justifyContent: 'center', gap: 7, marginBottom: 11 },
   locationButtonDone: { backgroundColor: '#ECFDF3', borderColor: '#B7E7C8' },
   locationButtonText: { color: PURPLE, fontWeight: '900', fontSize: 13 },
