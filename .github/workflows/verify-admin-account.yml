@@ -34,7 +34,8 @@ jobs:
           set -eu
           cd '${{ secrets.DEPLOY_PATH }}/api'
           php artisan tinker --execute='$u=App\Models\User::where("username","admin")->first(); if(!$u){throw new Exception("ADMIN_MISSING");} echo "ADMIN_USERNAME=".$u->username.PHP_EOL; echo "ADMIN_ROLE=".$u->role.PHP_EOL; echo "ADMIN_ACTIVE=".($u->is_active?"YES":"NO").PHP_EOL; echo "ADMIN_PASSWORD_HASH=".($u->password?"PRESENT":"MISSING").PHP_EOL;'
-          php artisan route:list --path=auth/admin-login --columns=method,uri,action
-          php artisan route:list --path=admin/users --columns=method,uri,action
+          php artisan route:list --path=auth/admin-login | grep -q 'auth/admin-login'
+          php artisan route:list --path=admin/users | grep -q 'admin/users'
+          php artisan route:list --path=admin/settings | grep -q 'admin/settings'
           echo ADMIN_SYSTEM=READY
           REMOTE
