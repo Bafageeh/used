@@ -10,7 +10,7 @@ use Illuminate\Validation\Rule;
 class ListingController extends Controller
 {
  public function index(Request $request) {
-  return Listing::query()->with(['category:id,name,slug','images:id,listing_id,path,sort_order'])
+  return Listing::query()->with(['category:id,name,slug','images:id,listing_id,path,sort_order','user:id,name'])
    ->where('status','published')
    ->when($request->filled('q'), function ($query) use ($request) {
     $term='%'.$request->string('q')->trim().'%';
