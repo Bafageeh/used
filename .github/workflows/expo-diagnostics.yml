@@ -39,6 +39,12 @@ jobs:
             ps -ef | grep -E '[e]xpo|[n]grok|8091' | tail -n 30 || true
             echo '--- PORT ---'
             curl -sSI http://127.0.0.1:8091 2>/dev/null | head -n 10 || true
+            echo '--- PACKAGE VERSIONS ---'
+            npm ls expo expo-router react react-native react-native-screens @expo/metro-runtime --depth=0 || true
+            echo '--- EXPO INSTALL CHECK ---'
+            npx expo install --check || true
+            echo '--- EXPO DOCTOR ---'
+            npx expo-doctor@latest || true
             echo '--- ERRORS ---'
             if [ -f expo.log ]; then
               sed -r 's/\x1B\[[0-9;?]*[ -\/]*[@-~]//g' expo.log | grep -Ei 'error|exception|fatal|invariant|typeerror|referenceerror|addViewAt|fabric|crash|failed' | tail -n 160 || true
