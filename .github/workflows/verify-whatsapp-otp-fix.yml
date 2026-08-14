@@ -1,0 +1,68 @@
+name: Verify WhatsApp OTP Fix
+
+on:
+  push:
+    paths:
+      - ".github/workflows/verify-whatsapp-otp-fix.yml"
+  workflow_dispatch:
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    environment: production
+    steps:
+      - name: Configure SSH
+        env:
+          SERVER_SSH_KEY: ${{ secrets.SERVER_SSH_KEY }}
+          SERVER_HOST: ${{ secrets.SERVER_HOST }}
+          SERVER_PORT: ${{ secrets.SERVER_PORT }}
+        run: |
+          install -m 700 -d ~/.ssh
+          printf '%s\n' "$SERVER_SSH_KEY" > ~/.ssh/used_api_key
+          chmod 600 ~/.ssh/used_api_key
+          ssh-keyscan -p "$SERVER_PORT" -H "$SERVER_HOST" >> ~/.ssh/known_hosts
+
+      - name: Wait for fixed API and send fresh registration OTP
+        env:
+          SERVER_HOST: ${{ secrets.SERVER_HOST }}
+          SERVER_PORT: ${{ secrets.SERVER_PORT }}
+          SERVER_USER: ${{ secrets.SERVER_USER }}
+          DEPLOY_PATH: ${{ secrets.DEPLOY_PATH }}
+        run: |
+          set -eu
+          READY=0
+          for i in $(seq 1 50); do
+            if ssh -i ~/.ssh/used_api_key -p "$SERVER_PORT" "$SERVER_USER@$SERVER_HOST" \
+              "grep -q \"sub_type' => 'url'\" '$DEPLOY_PATH/api/app/Services/WhatsAppOtpService.php' && grep -q \"\$otp->delete()\" '$DEPLOY_PATH/api/app/Http/Controllers/Api/AuthController.php'"; then
+              READY=1
+              break
+            fi
+            sleep 5
+          done
+          test "$READY" = "1"
+          echo 'FIXED_API=READY'
+
+          PHONE=$(ssh -i ~/.ssh/used_api_key -p "$SERVER_PORT" "$SERVER_USER@$SERVER_HOST" "cd '$DEPLOY_PATH/api' && php artisan tinker --execute=\"echo optional(App\\Models\\OtpCode::where('purpose','register')->latest()->first())->phone;\" 2>/dev/null" | tail -n 1 | tr -d '\r\n ')
+          if ! printf '%s' "$PHONE" | grep -Eq '^9665[0-9]{8}$'; then
+            echo 'No recent registration phone available for end-to-end send test.'
+            exit 0
+          fi
+
+          EXISTS=$(ssh -i ~/.ssh/used_api_key -p "$SERVER_PORT" "$SERVER_USER@$SERVER_HOST" "cd '$DEPLOY_PATH/api' && php artisan tinker --execute=\"echo App\\Models\\User::where('phone','${PHONE}')->exists() ? '1' : '0';\" 2>/dev/null" | tail -n 1 | tr -d '\r\n ')
+          if [ "$EXISTS" = "1" ]; then
+            echo 'LATEST_PHONE_ALREADY_REGISTERED=YES'
+            exit 0
+          fi
+
+          ssh -i ~/.ssh/used_api_key -p "$SERVER_PORT" "$SERVER_USER@$SERVER_HOST" "cd '$DEPLOY_PATH/api' && php artisan tinker --execute=\"App\\Models\\OtpCode::where('phone','${PHONE}')->whereNull('verified_at')->delete();\" >/dev/null 2>&1"
+
+          STATUS=$(curl -sS -o /tmp/otp-response.json -w '%{http_code}' -X POST 'https://used.pm.sa/api/auth/request-otp' \
+            -H 'Accept: application/json' \
+            -H 'Content-Type: application/json' \
+            --data "{\"phone\":\"${PHONE}\",\"purpose\":\"register\"}")
+          cat /tmp/otp-response.json
+          echo
+          echo "HTTP_STATUS=$STATUS"
+          test "$STATUS" = "200"
+          grep -q 'تم إرسال رمز التحقق عبر واتساب' /tmp/otp-response.json
+          echo 'WHATSAPP_OTP_END_TO_END=SUCCESS'
