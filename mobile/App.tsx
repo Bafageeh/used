@@ -16,6 +16,7 @@ import Ionicons from '@expo/vector-icons/Ionicons';
 import * as ImagePicker from 'expo-image-picker';
 import * as FileSystem from 'expo-file-system/legacy';
 import * as Location from 'expo-location';
+import * as SecureStore from 'expo-secure-store';
 
 type Category = { id: number; name: string; slug?: string };
 type ListingImage = { id: number; url?: string; path?: string };
@@ -625,12 +626,14 @@ export default function App() {
   const [refreshKey, setRefreshKey] = useState(0);
   const [token, setToken] = useState('');
   const [user, setUser] = useState<User | null>(null);
+  const [authRestoring, setAuthRestoring] = useState(true);
   const [mine, setMine] = useState<Listing[]>([]);
   const [mineLoading, setMineLoading] = useState(false);
   const [detail, setDetail] = useState<Listing | null>(null);
   const [detailLoading, setDetailLoading] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
   const [editListing, setEditListing] = useState<Listing | null>(null);
+  const [editReturnDetailId, setEditReturnDetailId] = useState<number | null>(null);
   const [manageBusyId, setManageBusyId] = useState<number | null>(null);
 
   const [searchDraft, setSearchDraft] = useState('');
@@ -675,6 +678,25 @@ export default function App() {
   }, [listingsPath]);
 
   useEffect(() => { loadHome(); }, [loadHome, refreshKey]);
+
+  useEffect(() => {
+    let active = true;
+    (async () => {
+      try {
+        const storedToken = await SecureStore.getItemAsync('used_auth_token');
+        if (!storedToken) return;
+        const me = await request<User>('/me', {}, storedToken);
+        if (!active) return;
+        setToken(storedToken);
+        setUser(me);
+      } catch {
+        await SecureStore.deleteItemAsync('used_auth_token').catch(() => undefined);
+      } finally {
+        if (active) setAuthRestoring(false);
+      }
+    })();
+    return () => { active = false; };
+  }, []);
 
   useEffect(() => {
     if (screen !== 'mine' || !token) return;
@@ -744,6 +766,9 @@ export default function App() {
         setManageBusyId(item.id);
         try {
           await request(`/listings/${item.id}/refresh`, { method: 'POST' }, token);
+          const refreshedAt = new Date().toISOString();
+          setDetail((current) => current?.id === item.id ? { ...current, status: 'published', published_at: refreshedAt } : current);
+          setMine((current) => current.map((row) => row.id === item.id ? { ...row, status: 'published', published_at: refreshedAt } : row));
           setRefreshKey((x) => x + 1);
           Alert.alert('تم التحديث', 'تم تحديث الإعلان ورفعه للأعلى.');
         } catch (e) {
@@ -765,6 +790,10 @@ export default function App() {
           setMine((current) => current.filter((x) => x.id !== item.id));
           setListings((current) => current.filter((x) => x.id !== item.id));
           setFavorites((current) => current.filter((id) => id !== item.id));
+          setDetail((current) => current?.id === item.id ? null : current);
+          setEditListing((current) => current?.id === item.id ? null : current);
+          setEditReturnDetailId(null);
+          setScreen('home');
           setRefreshKey((x) => x + 1);
           Alert.alert('تم الحذف', 'تم حذف الإعلان.');
         } catch (e) {
@@ -776,12 +805,29 @@ export default function App() {
     ]);
   };
 
-  const editOwnListing = (item: Listing) => {
+  const editOwnListing = (item: Listing, returnToDetail = false) => {
+    setEditReturnDetailId(returnToDetail ? item.id : null);
     setEditListing(item);
+    setDetail(null);
     setScreen('add');
   };
 
-  const loggedIn = (nextToken: string, nextUser: User) => { setToken(nextToken); setUser(nextUser); };
+  const loggedIn = (nextToken: string, nextUser: User) => {
+    setToken(nextToken);
+    setUser(nextUser);
+    SecureStore.setItemAsync('used_auth_token', nextToken).catch(() => undefined);
+  };
+
+  const logout = () => {
+    SecureStore.deleteItemAsync('used_auth_token').catch(() => undefined);
+    setToken('');
+    setUser(null);
+    setMine([]);
+    setDetail(null);
+    setEditListing(null);
+    setEditReturnDetailId(null);
+    setScreen('home');
+  };
   const published = () => { setEditListing(null); setRefreshKey((x) => x + 1); setScreen('home'); };
   const resetFilters = () => {
     setSelectedCategory(undefined);
@@ -918,6 +964,8 @@ export default function App() {
   if (detail) {
     const photos = detail.images || [];
     const favorite = favorites.includes(detail.id);
+    const isOwner = Boolean(token && user && detail.user?.id === user.id);
+    const statusLabel = detail.status === 'sold' ? 'مباع' : detail.status === 'archived' ? 'مؤرشف' : detail.status === 'draft' ? 'مسودة' : 'منشور';
     return (
       <View style={styles.root}>
         <StatusBar barStyle="light-content" backgroundColor={PURPLE_DARK} />
@@ -948,6 +996,39 @@ export default function App() {
             ) : null}
             {detail.user?.phone ? (
               <View style={styles.phoneBox}><Ionicons name="call" size={20} color="#fff" /><Text style={styles.phoneText}>{detail.user.phone}</Text></View>
+            ) : null}
+
+            {isOwner ? (
+              <View style={styles.ownerManageSection}>
+                <View style={styles.ownerManageHeading}>
+                  <View style={styles.ownerStatusBadge}><Text style={styles.ownerStatusText}>الحالة: {statusLabel}</Text></View>
+                  <View style={styles.ownerManageTitleWrap}>
+                    <Text style={styles.ownerManageTitle}>إدارة إعلانك</Text>
+                    <Text style={styles.ownerManageHint}>هذه الخيارات تظهر لك فقط بصفتك صاحب الإعلان</Text>
+                  </View>
+                </View>
+
+                <View style={styles.ownerManageGrid}>
+                  <Pressable style={[styles.ownerManageButton, styles.ownerEditButton]} onPress={() => editOwnListing(detail, true)} disabled={manageBusyId === detail.id}>
+                    <Ionicons name="create-outline" size={21} color={PURPLE} />
+                    <Text style={styles.ownerEditButtonText}>تعديل الإعلان</Text>
+                  </Pressable>
+                  <Pressable style={[styles.ownerManageButton, styles.ownerRefreshButton]} onPress={() => refreshOwnListing(detail)} disabled={manageBusyId === detail.id}>
+                    {manageBusyId === detail.id ? <ActivityIndicator size="small" color="#16834A" /> : <Ionicons name="refresh-outline" size={21} color="#16834A" />}
+                    <Text style={styles.ownerRefreshButtonText}>تحديث الإعلان</Text>
+                  </Pressable>
+                  <Pressable style={[styles.ownerManageButton, styles.ownerStatusButton]} onPress={() => editOwnListing(detail, true)} disabled={manageBusyId === detail.id}>
+                    <Ionicons name="swap-horizontal-outline" size={21} color="#B45309" />
+                    <Text style={styles.ownerStatusButtonText}>تغيير الحالة</Text>
+                  </Pressable>
+                  <Pressable style={[styles.ownerManageButton, styles.ownerDeleteButton]} onPress={() => deleteOwnListing(detail)} disabled={manageBusyId === detail.id}>
+                    <Ionicons name="trash-outline" size={21} color="#DC2626" />
+                    <Text style={styles.ownerDeleteButtonText}>حذف الإعلان</Text>
+                  </Pressable>
+                </View>
+              </View>
+            ) : authRestoring ? (
+              <View style={styles.ownerRestoreRow}><ActivityIndicator size="small" color={PURPLE} /><Text style={styles.ownerRestoreText}>جاري التحقق من حسابك...</Text></View>
             ) : null}
           </View>
         </ScrollView>
@@ -984,28 +1065,14 @@ export default function App() {
       {favoriteListings.length ? favoriteListings.map((item) => <ListingCard key={item.id} item={item} favorite onFavorite={() => toggleFavorite(item.id)} onPress={() => openDetail(item.id)} />) : <EmptyScreen icon="heart-outline" title="لا توجد مفضلة" text="اضغط على القلب في أي إعلان لحفظه هنا." />}
     </ScrollView>
   );
-  if (screen === 'add') content = token ? (editListing ? <EditListing listing={editListing} categories={categories} token={token} onSaved={() => { setEditListing(null); setRefreshKey((x) => x + 1); setScreen('mine'); }} onCancel={() => { setEditListing(null); setScreen('mine'); }} /> : <CreateListing categories={categories} token={token} onPublished={published} />) : <LoginPanel onLogin={loggedIn} />;
+  if (screen === 'add') content = token ? (editListing ? <EditListing listing={editListing} categories={categories} token={token} onSaved={() => { const returnId = editReturnDetailId; setEditListing(null); setEditReturnDetailId(null); setRefreshKey((x) => x + 1); if (returnId) { setScreen('home'); void openDetail(returnId); } else { setScreen('mine'); } }} onCancel={() => { const returnId = editReturnDetailId; setEditListing(null); setEditReturnDetailId(null); if (returnId) { setScreen('home'); void openDetail(returnId); } else { setScreen('mine'); } }} /> : <CreateListing categories={categories} token={token} onPublished={published} />) : <LoginPanel onLogin={loggedIn} />;
   if (screen === 'notifications') content = <EmptyScreen icon="notifications-outline" title="الإشعارات" text="ستظهر هنا تحديثات إعلاناتك وطلبات المشترين عند ربط خدمة الإشعارات." />;
   if (screen === 'messages') content = <EmptyScreen icon="chatbubble-ellipses-outline" title="الرسائل" text="واجهة الرسائل جاهزة في الشريط، وسيتم ربط المحادثات بقاعدة البيانات لاحقًا." />;
   if (screen === 'mine') content = token ? (
     <ScrollView contentContainerStyle={styles.standardPage}>
       <Text style={styles.sectionTitle}>إعلاناتي</Text>
       {mineLoading ? <ActivityIndicator color={PURPLE} /> : mine.length ? mine.map((item) => (
-        <View key={item.id} style={styles.manageListingWrap}>
-          <ListingCard item={item} favorite={favorites.includes(item.id)} onFavorite={() => toggleFavorite(item.id)} onPress={() => openDetail(item.id)} />
-          <View style={styles.manageActions}>
-            <Pressable style={[styles.manageButton, styles.manageEdit]} onPress={() => editOwnListing(item)} disabled={manageBusyId === item.id}>
-              <Ionicons name="create-outline" size={18} color={PURPLE} /><Text style={styles.manageEditText}>تعديل</Text>
-            </Pressable>
-            <Pressable style={[styles.manageButton, styles.manageRefresh]} onPress={() => refreshOwnListing(item)} disabled={manageBusyId === item.id}>
-              {manageBusyId === item.id ? <ActivityIndicator size="small" color="#16834A" /> : <Ionicons name="refresh-outline" size={18} color="#16834A" />}
-              <Text style={styles.manageRefreshText}>تحديث</Text>
-            </Pressable>
-            <Pressable style={[styles.manageButton, styles.manageDelete]} onPress={() => deleteOwnListing(item)} disabled={manageBusyId === item.id}>
-              <Ionicons name="trash-outline" size={18} color="#DC2626" /><Text style={styles.manageDeleteText}>حذف</Text>
-            </Pressable>
-          </View>
-        </View>
+        <ListingCard key={item.id} item={item} favorite={favorites.includes(item.id)} onFavorite={() => toggleFavorite(item.id)} onPress={() => openDetail(item.id)} />
       )) : <EmptyScreen icon="albums-outline" title="لا توجد إعلانات" text="أضف أول إعلان لك من زر الإضافة." />}
     </ScrollView>
   ) : <LoginPanel onLogin={loggedIn} />;
@@ -1018,7 +1085,7 @@ export default function App() {
         <Text style={styles.accountPhone}>{user.phone}</Text>
       </View>
       <Pressable style={styles.menuAction} onPress={() => setScreen('mine')}><Ionicons name="albums-outline" size={22} color={PURPLE} /><Text style={styles.menuActionText}>إعلاناتي</Text><Ionicons name="chevron-back" size={20} color="#A1A1AA" /></Pressable>
-      <Pressable style={styles.dangerButton} onPress={() => { setToken(''); setUser(null); setMine([]); setScreen('home'); }}><Ionicons name="log-out-outline" size={20} color="#DC2626" /><Text style={styles.dangerText}>تسجيل الخروج</Text></Pressable>
+      <Pressable style={styles.dangerButton} onPress={logout}><Ionicons name="log-out-outline" size={20} color="#DC2626" /><Text style={styles.dangerText}>تسجيل الخروج</Text></Pressable>
     </ScrollView>
   ) : <LoginPanel onLogin={loggedIn} />;
 
@@ -1122,6 +1189,26 @@ export default function App() {
 }
 
 const styles = StyleSheet.create({
+  ownerManageSection: { marginTop: 18, borderTopWidth: 1, borderTopColor: '#EEE7F5', paddingTop: 16 },
+  ownerManageHeading: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 12, marginBottom: 13 },
+  ownerManageTitleWrap: { flex: 1, alignItems: 'flex-end' },
+  ownerManageTitle: { color: TEXT, fontSize: 17, fontWeight: '900', textAlign: 'right' },
+  ownerManageHint: { color: MUTED, fontSize: 10, marginTop: 3, textAlign: 'right' },
+  ownerStatusBadge: { borderRadius: 14, backgroundColor: PURPLE_LIGHT, paddingHorizontal: 10, paddingVertical: 6 },
+  ownerStatusText: { color: PURPLE, fontSize: 11, fontWeight: '900' },
+  ownerManageGrid: { flexDirection: 'row-reverse', flexWrap: 'wrap', gap: 9 },
+  ownerManageButton: { width: '48.5%', minHeight: 48, borderRadius: 13, borderWidth: 1, flexDirection: 'row-reverse', alignItems: 'center', justifyContent: 'center', gap: 7, paddingHorizontal: 8 },
+  ownerEditButton: { backgroundColor: '#F7F1FF', borderColor: '#CFB8F5' },
+  ownerEditButtonText: { color: PURPLE, fontSize: 12, fontWeight: '900' },
+  ownerRefreshButton: { backgroundColor: '#F0FDF4', borderColor: '#BBE7C9' },
+  ownerRefreshButtonText: { color: '#16834A', fontSize: 12, fontWeight: '900' },
+  ownerStatusButton: { backgroundColor: '#FFF7ED', borderColor: '#FED7AA' },
+  ownerStatusButtonText: { color: '#B45309', fontSize: 12, fontWeight: '900' },
+  ownerDeleteButton: { backgroundColor: '#FEF2F2', borderColor: '#FECACA' },
+  ownerDeleteButtonText: { color: '#DC2626', fontSize: 12, fontWeight: '900' },
+  ownerRestoreRow: { marginTop: 14, flexDirection: 'row-reverse', justifyContent: 'center', alignItems: 'center', gap: 7, paddingVertical: 10 },
+  ownerRestoreText: { color: MUTED, fontSize: 11 },
+
   root: { flex: 1, backgroundColor: SURFACE },
   content: { flex: 1 },
   center: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: 10, backgroundColor: '#fff' },
