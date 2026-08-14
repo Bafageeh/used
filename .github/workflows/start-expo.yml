@@ -128,42 +128,47 @@ jobs:
             sleep 3
             if curl -fsS http://127.0.0.1:8091 >/dev/null 2>&1; then
               echo "Expo local server is running"
-              break
+              exit 0
             fi
             kill -0 "$EXPO_PID" 2>/dev/null || break
           done
-          curl -fsS http://127.0.0.1:8091 >/dev/null
 
-          echo 'Checking public Cloudflare route...'
-          curl -fsS --retry 8 --retry-delay 2 "$CF_URL" >/dev/null
-          echo "EXPO_GO_URL=exps://${CF_URL#https://}"
-          echo '--- Expo open endpoint ---'
-          curl -fsS "$CF_URL/_expo/open?platform=android&runtime=expo" || true
-          echo
+          echo 'Expo local server failed to start'
+          tail -n 120 "$MOBILE_PATH/expo.log" || true
+          exit 1
           REMOTE
 
-      - name: Verify Expo and print test URL
+      - name: Verify public tunnel from GitHub runner and print test URL
         env:
           SERVER_HOST: ${{ secrets.SERVER_HOST }}
           SERVER_PORT: ${{ secrets.SERVER_PORT }}
           SERVER_USER: ${{ secrets.SERVER_USER }}
           DEPLOY_PATH: ${{ secrets.DEPLOY_PATH }}
         run: |
+          CF_URL=$(ssh -i ~/.ssh/used_expo_key -p "$SERVER_PORT" "$SERVER_USER@$SERVER_HOST" "cat '$DEPLOY_PATH/mobile/tunnel-url.txt'")
+          echo "Cloudflare URL: $CF_URL"
+          PUBLIC_OK=0
+          for i in $(seq 1 15); do
+            if curl -fsS --connect-timeout 5 --max-time 15 "$CF_URL" >/dev/null 2>&1; then
+              PUBLIC_OK=1
+              break
+            fi
+            sleep 3
+          done
+          if [ "$PUBLIC_OK" != "1" ]; then
+            echo 'Public tunnel is not reachable from GitHub runner.'
+            exit 1
+          fi
+          echo 'PUBLIC_TUNNEL=RUNNING'
+          echo "EXPO_GO_TEST_URL=exps://${CF_URL#https://}"
+          echo '--- EXPO OPEN ENDPOINT ---'
+          curl -fsS "$CF_URL/_expo/open?platform=android&runtime=expo" || true
+          echo
+          echo '--- SERVER LOGS ---'
           ssh -i ~/.ssh/used_expo_key -p "$SERVER_PORT" "$SERVER_USER@$SERVER_HOST" "
-            MOBILE_PATH='$DEPLOY_PATH/mobile'
-            cd \"\$MOBILE_PATH\"
-            CF_URL=\$(cat tunnel-url.txt 2>/dev/null || true)
-            echo '--- EXPO PROCESS ---'
-            curl -fsS http://127.0.0.1:8091 >/dev/null && echo RUNNING
-            echo '--- CLOUDFLARE PROCESS ---'
-            test -n \"\$CF_URL\" && curl -fsS \"\$CF_URL\" >/dev/null && echo RUNNING
-            echo '--- EXPO GO TEST URL ---'
-            test -n \"\$CF_URL\" && echo \"exps://\${CF_URL#https://}\"
-            echo '--- OPEN ENDPOINT ---'
-            test -n \"\$CF_URL\" && curl -fsS \"\$CF_URL/_expo/open?platform=android&runtime=expo\" || true
-            echo
-            echo '--- EXPO LOG ---'
-            tail -n 120 expo.log || true
-            echo '--- CLOUDFLARE LOG ---'
-            tail -n 80 cloudflared.log || true
+            cd '$DEPLOY_PATH/mobile'
+            echo 'EXPO:'
+            tail -n 100 expo.log || true
+            echo 'CLOUDFLARE:'
+            tail -n 60 cloudflared.log || true
           "
