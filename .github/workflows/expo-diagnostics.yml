@@ -1,0 +1,50 @@
+name: Used Expo Diagnostics
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - ".github/workflows/expo-diagnostics.yml"
+
+jobs:
+  diagnose:
+    runs-on: ubuntu-latest
+    environment: production
+    steps:
+      - name: Configure SSH
+        env:
+          SERVER_SSH_KEY: ${{ secrets.SERVER_SSH_KEY }}
+          SERVER_HOST: ${{ secrets.SERVER_HOST }}
+          SERVER_PORT: ${{ secrets.SERVER_PORT }}
+        run: |
+          install -m 700 -d ~/.ssh
+          printf '%s\n' "$SERVER_SSH_KEY" > ~/.ssh/used_diag_key
+          chmod 600 ~/.ssh/used_diag_key
+          ssh-keyscan -p "$SERVER_PORT" -H "$SERVER_HOST" >> ~/.ssh/known_hosts
+
+      - name: Read current Expo diagnostics
+        env:
+          SERVER_HOST: ${{ secrets.SERVER_HOST }}
+          SERVER_PORT: ${{ secrets.SERVER_PORT }}
+          SERVER_USER: ${{ secrets.SERVER_USER }}
+          DEPLOY_PATH: ${{ secrets.DEPLOY_PATH }}
+        run: |
+          ssh -i ~/.ssh/used_diag_key -p "$SERVER_PORT" "$SERVER_USER@$SERVER_HOST" "
+            MOBILE_PATH=\$(dirname '$DEPLOY_PATH')/mobile
+            cd \"\$MOBILE_PATH\" || exit 1
+            echo '--- LOCATION ---'
+            pwd
+            echo '--- PROCESS ---'
+            ps -ef | grep -E '[e]xpo|[n]grok|8091' | tail -n 30 || true
+            echo '--- PORT ---'
+            curl -sSI http://127.0.0.1:8091 2>/dev/null | head -n 10 || true
+            echo '--- ERRORS ---'
+            if [ -f expo.log ]; then
+              sed -r 's/\x1B\[[0-9;?]*[ -\/]*[@-~]//g' expo.log | grep -Ei 'error|exception|fatal|invariant|typeerror|referenceerror|addViewAt|fabric|crash|failed' | tail -n 160 || true
+              echo '--- LAST LOG ---'
+              sed -r 's/\x1B\[[0-9;?]*[ -\/]*[@-~]//g' expo.log | tail -n 220 || true
+            else
+              echo 'expo.log missing'
+            fi
+          "
