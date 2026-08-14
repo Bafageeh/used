@@ -1,0 +1,85 @@
+name: Deploy Used API
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "api/**"
+      - ".github/workflows/deploy.yml"
+  workflow_dispatch:
+
+concurrency:
+  group: used-api-production
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    environment: production
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Configure SSH
+        env:
+          SERVER_SSH_KEY: ${{ secrets.SERVER_SSH_KEY }}
+          SERVER_HOST: ${{ secrets.SERVER_HOST }}
+          SERVER_PORT: ${{ secrets.SERVER_PORT }}
+        run: |
+          install -m 700 -d ~/.ssh
+          printf '%s\n' "$SERVER_SSH_KEY" > ~/.ssh/used_api_key
+          chmod 600 ~/.ssh/used_api_key
+          ssh-keyscan -p "$SERVER_PORT" -H "$SERVER_HOST" >> ~/.ssh/known_hosts
+
+      - name: Upload API to active Laravel app
+        env:
+          SERVER_HOST: ${{ secrets.SERVER_HOST }}
+          SERVER_PORT: ${{ secrets.SERVER_PORT }}
+          SERVER_USER: ${{ secrets.SERVER_USER }}
+          DEPLOY_PATH: ${{ secrets.DEPLOY_PATH }}
+        run: |
+          tar --exclude=vendor --exclude=.env -C api -czf /tmp/used-api.tgz .
+          scp -i ~/.ssh/used_api_key -P "$SERVER_PORT" /tmp/used-api.tgz "$SERVER_USER@$SERVER_HOST:/tmp/used-api.tgz"
+          ssh -i ~/.ssh/used_api_key -p "$SERVER_PORT" "$SERVER_USER@$SERVER_HOST" "bash -s" <<'REMOTE'
+          set -eu
+          API_PATH='${{ secrets.DEPLOY_PATH }}/api'
+          cd "$API_PATH"
+          test -f artisan
+          test -f .env
+          tar -xzf /tmp/used-api.tgz
+          rm -f /tmp/used-api.tgz
+
+          export COMPOSER_ALLOW_SUPERUSER=1
+          composer install --no-dev --prefer-dist --no-interaction --optimize-autoloader
+
+          mkdir -p storage/app/public/listings storage/framework/cache storage/framework/sessions storage/framework/views storage/logs bootstrap/cache
+          chmod -R ug+rwX storage bootstrap/cache
+
+          php artisan optimize:clear
+          php artisan migrate --force
+          php artisan storage:link || test -L public/storage
+
+          # Backward compatibility: old accounts used the password column for the numeric PIN.
+          # Copy the existing hash once so those users can log in through the new pin endpoint.
+          php artisan tinker --execute="Illuminate\\Support\\Facades\\DB::table('users')->whereNull('pin')->whereNotNull('password')->update(['pin' => Illuminate\\Support\\Facades\\DB::raw('password')]);"
+
+          php artisan config:cache
+          php artisan view:cache
+
+          echo '--- ACTIVE AUTH CONTROLLER ---'
+          grep -n "'pin'" app/Http/Controllers/Api/AuthController.php | head -n 5
+          echo '--- STORAGE LINK ---'
+          ls -ld public/storage
+          REMOTE
+
+      - name: Verify production login contract
+        run: |
+          response=$(curl -sS -X POST 'https://used.pm.sa/api/auth/login' \
+            -H 'Accept: application/json' \
+            -H 'Content-Type: application/json' \
+            --data '{"phone":"966500000000","pin":"1234","device_name":"deploy-check"}')
+          echo "$response"
+          if printf '%s' "$response" | grep -qi 'password field is required'; then
+            echo 'Production is still using the old password login contract.'
+            exit 1
+          fi
+          echo 'LOGIN_CONTRACT=PIN'
