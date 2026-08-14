@@ -10,6 +10,7 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Validation\Rule;
+use Throwable;
 
 class AuthController extends Controller
 {
@@ -25,10 +26,26 @@ class AuthController extends Controller
         if (OtpCode::where('phone', $data['phone'])->where('created_at', '>', now()->subMinute())->exists()) {
             return response()->json(['message' => 'انتظر دقيقة قبل طلب رمز جديد.'], 429);
         }
+
         $code = (string) random_int(100000, 999999);
         OtpCode::where('phone', $data['phone'])->whereNull('verified_at')->delete();
-        OtpCode::create(['phone'=>$data['phone'],'purpose'=>$data['purpose'],'code_hash'=>Hash::make($code),'expires_at'=>now()->addMinutes(5)]);
-        $whatsApp->send($data['phone'], $code);
+        $otp = OtpCode::create([
+            'phone' => $data['phone'],
+            'purpose' => $data['purpose'],
+            'code_hash' => Hash::make($code),
+            'expires_at' => now()->addMinutes(5),
+        ]);
+
+        try {
+            $whatsApp->send($data['phone'], $code);
+        } catch (Throwable $e) {
+            $otp->delete();
+            report($e);
+            return response()->json([
+                'message' => 'تعذر إرسال رمز التحقق عبر واتساب. حاول مرة أخرى.',
+            ], 502);
+        }
+
         return ['message' => 'تم إرسال رمز التحقق عبر واتساب.', 'expires_in' => 300];
     }
 
