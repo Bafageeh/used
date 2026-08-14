@@ -33,6 +33,7 @@ class ListingController extends Controller
  }
  public function store(Request $request) {
   $data=$this->validated($request); $data['price']=null; $data['user_id']=$request->user()->id;
+  $data['item_condition']=$data['item_condition'] ?? 'used_good';
   $data['published_at']=$data['status']==='published'?now():null;
   return response()->json(Listing::create($data),201);
  }
@@ -59,6 +60,7 @@ class ListingController extends Controller
   return $request->validate([
    'category_id'=>['required','exists:categories,id'],'title'=>['required','string','max:120'],
    'description'=>['required','string','max:5000'],
+   'item_condition'=>['sometimes',Rule::in(['new_good','new_defect','used_good','used_defect'])],
    'city'=>['required','string','max:80'],'latitude'=>['nullable','numeric','between:-90,90'],
    'longitude'=>['nullable','numeric','between:-180,180'],'status'=>['required',Rule::in(['draft','published','sold','archived'])],
    'show_phone'=>['sometimes','boolean'],
