@@ -28,6 +28,7 @@ jobs:
         working-directory: mobile
         run: |
           npm install
+          npx expo install --fix
           npx tsc --noEmit
           npx expo install --check
           npx expo export --platform android --output-dir /tmp/used-camera-video-bundle
@@ -39,10 +40,9 @@ jobs:
           php -l api/database/migrations/2026_08_14_185500_add_video_to_listings.php
       - name: Commit mobile changes
         run: |
-          git checkout -- mobile/package-lock.json || true
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add mobile/App.tsx
+          git add mobile/App.tsx mobile/package.json mobile/package-lock.json
           git diff --cached --quiet || git commit -m "Add direct camera and optional listing video"
           git push origin HEAD:main
       - name: Dispatch deployments
