@@ -23,16 +23,14 @@ try {
   console.warn('Could not materialize app icon:', error.message);
 }
 
+const { adaptiveIcon, ...androidConfig } = appJson.expo.android || {};
+
 const expo = {
   ...appJson.expo,
   icon: './assets/icon.png',
   android: {
-    ...appJson.expo.android,
-    adaptiveIcon: {
-      ...(appJson.expo.android?.adaptiveIcon || {}),
-      foregroundImage: './assets/icon.png',
-      backgroundColor: '#5B21B6',
-    },
+    ...androidConfig,
+    icon: './assets/icon.png',
   },
 };
 
