@@ -1,0 +1,52 @@
+name: Apply WhatsApp OTP Registration
+
+on:
+  push:
+    paths:
+      - scripts/patch-whatsapp-registration.py
+      - .github/workflows/apply-whatsapp-registration.yml
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  actions: write
+
+jobs:
+  apply:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22.13.1
+
+      - name: Apply patch
+        run: python3 scripts/patch-whatsapp-registration.py
+
+      - name: Validate mobile
+        working-directory: mobile
+        run: |
+          npm install --no-audit --no-fund
+          npx tsc --noEmit
+
+      - name: Commit changes
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add mobile/App.tsx
+          git diff --cached --quiet && exit 0
+          git commit -m "Add WhatsApp OTP registration"
+          git push origin main
+
+      - name: Restart Expo
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          curl -fsS -X POST \
+            -H "Authorization: Bearer $GH_TOKEN" \
+            -H "Accept: application/vnd.github+json" \
+            https://api.github.com/repos/${{ github.repository }}/actions/workflows/start-expo.yml/dispatches \
+            -d '{"ref":"main"}'
