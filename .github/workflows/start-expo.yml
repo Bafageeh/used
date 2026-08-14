@@ -120,9 +120,9 @@ jobs:
           echo "Cloudflare URL: $CF_URL"
 
           if command -v script >/dev/null 2>&1; then
-            nohup script -q -f -c "CI=1 EXPO_PACKAGER_PROXY_URL=$CF_URL npx expo start --clear --go --lan --port 8091" "$MOBILE_PATH/expo.log" > /dev/null 2>&1 < /dev/null &
+            nohup script -q -f -c "CI=1 EXPO_PUBLIC_USE_RN_FETCH=1 EXPO_PACKAGER_PROXY_URL=$CF_URL npx expo start --clear --go --lan --port 8091" "$MOBILE_PATH/expo.log" > /dev/null 2>&1 < /dev/null &
           else
-            nohup env CI=1 EXPO_PACKAGER_PROXY_URL="$CF_URL" npx expo start --clear --go --lan --port 8091 > "$MOBILE_PATH/expo.log" 2>&1 < /dev/null &
+            nohup env CI=1 EXPO_PUBLIC_USE_RN_FETCH=1 EXPO_PACKAGER_PROXY_URL="$CF_URL" npx expo start --clear --go --lan --port 8091 > "$MOBILE_PATH/expo.log" 2>&1 < /dev/null &
           fi
           EXPO_PID=$!
           echo "$EXPO_PID" > "$MOBILE_PATH/expo.pid"
