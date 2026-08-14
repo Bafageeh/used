@@ -21,6 +21,7 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('/my/listings', [ListingController::class, 'mine']);
     Route::post('/listings', [ListingController::class, 'store']);
     Route::patch('/listings/{listing}', [ListingController::class, 'update']);
+    Route::post('/listings/{listing}/refresh', [ListingController::class, 'refresh']);
     Route::delete('/listings/{listing}', [ListingController::class, 'destroy']);
     Route::post('/listings/{listing}/images', [ListingImageController::class, 'store']);
     Route::delete('/listing-images/{image}', [ListingImageController::class, 'destroy']);
