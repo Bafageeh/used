@@ -30,27 +30,39 @@ jobs:
           SERVER_USER: ${{ secrets.SERVER_USER }}
           DEPLOY_PATH: ${{ secrets.DEPLOY_PATH }}
         run: |
-          ssh -i ~/.ssh/used_diag_key -p "$SERVER_PORT" "$SERVER_USER@$SERVER_HOST" "
-            MOBILE_PATH='$DEPLOY_PATH/mobile'
-            cd \"\$MOBILE_PATH\" || exit 1
-            echo '--- LOCATION ---'
-            pwd
-            echo '--- PROCESS ---'
-            ps -ef | grep -E '[e]xpo|[n]grok|8091' | tail -n 30 || true
-            echo '--- PORT ---'
-            curl -sSI http://127.0.0.1:8091 2>/dev/null | head -n 10 || true
-            echo '--- PACKAGE VERSIONS ---'
-            npm ls expo expo-router react react-native react-native-screens @expo/metro-runtime --depth=0 || true
-            echo '--- EXPO INSTALL CHECK ---'
-            npx expo install --check || true
-            echo '--- EXPO DOCTOR ---'
-            npx expo-doctor@latest || true
-            echo '--- ERRORS ---'
-            if [ -f expo.log ]; then
-              sed -r 's/\x1B\[[0-9;?]*[ -\/]*[@-~]//g' expo.log | grep -Ei 'error|exception|fatal|invariant|typeerror|referenceerror|addViewAt|fabric|crash|failed|warning' | tail -n 220 || true
-              echo '--- LAST LOG ---'
-              sed -r 's/\x1B\[[0-9;?]*[ -\/]*[@-~]//g' expo.log | tail -n 320 || true
-            else
-              echo 'expo.log missing'
-            fi
-          "
+          ssh -i ~/.ssh/used_diag_key -p "$SERVER_PORT" "$SERVER_USER@$SERVER_HOST" "bash -s" <<'REMOTE'
+          MOBILE_PATH='${{ secrets.DEPLOY_PATH }}/mobile'
+          cd "$MOBILE_PATH" || exit 1
+          echo '--- LOCATION ---'
+          pwd
+          echo '--- PROCESS ---'
+          ps -ef | grep -E '[e]xpo|[c]loudflared|8091' | tail -n 30 || true
+          echo '--- PORT ---'
+          curl -sSI http://127.0.0.1:8091 2>/dev/null | head -n 10 || true
+          echo '--- LISTING IMAGE PAYLOAD ---'
+          python3 - <<'PY'
+          import json, urllib.request
+          url='https://used.pm.sa/api/listings'
+          req=urllib.request.Request(url, headers={'Accept':'application/json','User-Agent':'used-diagnostics'})
+          with urllib.request.urlopen(req, timeout=20) as r:
+              data=json.load(r)
+          for item in (data.get('data') or [])[:10]:
+              images=item.get('images') or []
+              print(json.dumps({
+                  'id': item.get('id'),
+                  'title': item.get('title'),
+                  'images_count': len(images),
+                  'images': [{'id': i.get('id'), 'path': i.get('path'), 'url': i.get('url')} for i in images[:8]],
+              }, ensure_ascii=False))
+          PY
+          echo '--- PACKAGE VERSIONS ---'
+          npm ls expo react react-native --depth=0 || true
+          echo '--- ERRORS ---'
+          if [ -f expo.log ]; then
+            sed -r 's/\x1B\[[0-9;?]*[ -\/]*[@-~]//g' expo.log | grep -Ei 'error|exception|fatal|invariant|typeerror|referenceerror|addViewAt|fabric|crash|failed|warning' | tail -n 160 || true
+            echo '--- LAST LOG ---'
+            sed -r 's/\x1B\[[0-9;?]*[ -\/]*[@-~]//g' expo.log | tail -n 220 || true
+          else
+            echo 'expo.log missing'
+          fi
+          REMOTE
