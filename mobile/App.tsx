@@ -976,7 +976,9 @@ export default function App() {
   }, [regionSearch]);
 
   const toggleRegionDraft = (name: string) => {
-    setRegionDraft((current) => current.includes(name) ? current.filter((x) => x !== name) : [...current, name]);
+    const next = regionDraft.includes(name) ? regionDraft.filter((x) => x !== name) : [...regionDraft, name];
+    setRegionDraft(next);
+    setSelectedRegions(next);
   };
 
   const header = (
@@ -1250,7 +1252,7 @@ export default function App() {
                 <Ionicons name="close" size={30} color="#55505B" />
               </Pressable>
               <Text style={styles.regionSheetTitle}>المناطق</Text>
-              <Pressable onPress={() => setRegionDraft([])} hitSlop={8}>
+              <Pressable onPress={() => { setRegionDraft([]); setSelectedRegions([]); }} hitSlop={8}>
                 <Text style={styles.regionClearText}>مسح الكل</Text>
               </Pressable>
             </View>
@@ -1268,7 +1270,7 @@ export default function App() {
             </View>
 
             <ScrollView style={styles.regionList} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
-              <Pressable style={styles.regionRow} onPress={() => setRegionDraft([])}>
+              <Pressable style={styles.regionRow} onPress={() => { setRegionDraft([]); setSelectedRegions([]); }}>
                 <Text style={styles.regionName}>الكل</Text>
                 <View style={[styles.regionCheckbox, regionDraft.length === 0 && styles.regionCheckboxChecked]}>
                   {regionDraft.length === 0 ? <Ionicons name="checkmark" size={19} color="#fff" /> : null}
@@ -1288,7 +1290,7 @@ export default function App() {
               <View style={{ height: 12 }} />
             </ScrollView>
 
-            <Pressable style={styles.regionApplyButton} onPress={() => { setSelectedRegions(regionDraft); setRegionOpen(false); }}>
+            <Pressable style={styles.regionApplyButton} onPress={() => setRegionOpen(false)}>
               <Text style={styles.regionApplyText}>تطبيق ({regionDraft.length})</Text>
             </Pressable>
           </View>
@@ -1542,7 +1544,7 @@ const styles = StyleSheet.create({
   fabActive: { backgroundColor: PURPLE_DARK },
   fabLabel: { color: '#fff', fontSize: 9, fontWeight: '900', marginTop: -4 },
 
-  regionOverlay: { ...StyleSheet.absoluteFill, zIndex: 70 },
+  regionOverlay: { ...StyleSheet.absoluteFill, zIndex: 70, elevation: 30 },
   regionBackdrop: { ...StyleSheet.absoluteFill, backgroundColor: 'rgba(9,5,14,.58)' },
   regionSheet: { position: 'absolute', left: 0, right: 0, bottom: 0, height: '89%', backgroundColor: '#F9F8FC', borderTopLeftRadius: 28, borderTopRightRadius: 28, paddingTop: 18, paddingHorizontal: 12, overflow: 'hidden' },
   regionSheetHeader: { height: 58, paddingHorizontal: 4, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
