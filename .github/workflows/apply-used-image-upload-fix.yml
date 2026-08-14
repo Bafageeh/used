@@ -19,11 +19,11 @@ jobs:
       - name: Apply patch
         run: python3 scripts/fix_used_legacy_upload.py
 
-      - name: Refresh lockfile and verify Expo packages
+      - name: Install and verify Expo packages
         working-directory: mobile
         run: |
           rm -f package-lock.json
-          npm install --package-lock-only
+          npm install
           npx expo install --check
 
       - name: Commit and push
