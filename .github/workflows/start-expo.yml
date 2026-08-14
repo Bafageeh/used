@@ -101,3 +101,5 @@ jobs:
             tail -n 120 \"\$CLEAN_LOG\" || true
             rm -f \"\$CLEAN_LOG\"
           "
+
+# Restart marker after SDK alignment: 2026-08-14
