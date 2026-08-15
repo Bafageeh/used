@@ -75,6 +75,17 @@ type ItemCondition = 'new_good' | 'new_defect' | 'used_good' | 'used_defect';
 
 type Coordinates = { latitude: number; longitude: number };
 
+async function cityFromCoordinates(coords: Coordinates): Promise<string> {
+  try {
+    const places = await Location.reverseGeocodeAsync(coords);
+    const place = places?.[0];
+    if (!place) return '';
+    return String(place.city || place.subregion || place.district || place.region || '').trim();
+  } catch {
+    return '';
+  }
+}
+
 const API_URL = 'https://used.pm.sa/api';
 const SITE_URL = 'https://used.pm.sa';
 const PURPLE = '#6426C8';
@@ -619,8 +630,15 @@ function CreateListing({ categories, token, onPublished }: { categories: Categor
       const permission = await Location.requestForegroundPermissionsAsync();
       if (!permission.granted) return Alert.alert('الموقع', 'اسمح للتطبيق بالوصول للموقع لإضافة الموقع الدقيق للإعلان.');
       const current = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Balanced });
-      setCoords({ latitude: current.coords.latitude, longitude: current.coords.longitude });
-      Alert.alert('تم تحديد الموقع', 'سيُحفظ الموقع الدقيق مع الإعلان لاستخدام ميزة القريب.');
+      const nextCoords = { latitude: current.coords.latitude, longitude: current.coords.longitude };
+      setCoords(nextCoords);
+      const detectedCity = await cityFromCoordinates(nextCoords);
+      if (detectedCity) {
+        setCity(detectedCity);
+        Alert.alert('تم تحديد الموقع', `تم تحديد المدينة تلقائيًا: ${detectedCity}`);
+      } else {
+        Alert.alert('تم تحديد الموقع', 'تم حفظ الموقع الدقيق، لكن تعذر معرفة اسم المدينة تلقائيًا. يمكنك كتابتها يدويًا.');
+      }
     } catch {
       Alert.alert('الموقع', 'تعذر تحديد موقعك الآن.');
     } finally {
@@ -719,11 +737,11 @@ function CreateListing({ categories, token, onPublished }: { categories: Categor
 
       <TextInput style={styles.input} value={title} onChangeText={setTitle} placeholder="عنوان الإعلان" textAlign="right" />
       <TextInput style={[styles.input, styles.textarea]} value={description} onChangeText={setDescription} placeholder="اكتب وصف السلعة وحالتها بالتفصيل..." multiline textAlignVertical="top" textAlign="right" />
-      <TextInput style={styles.input} value={city} onChangeText={setCity} placeholder="المدينة" textAlign="right" />
+      <TextInput style={styles.input} value={city} onChangeText={setCity} placeholder="المدينة — تُحدد تلقائيًا من الموقع" textAlign="right" />
 
       <Pressable style={[styles.locationButton, coords && styles.locationButtonDone]} onPress={useMyLocation} disabled={locating}>
         <Ionicons name={coords ? 'checkmark-circle' : 'navigate-outline'} size={21} color={coords ? '#16834A' : PURPLE} />
-        <Text style={[styles.locationButtonText, coords && { color: '#16834A' }]}>{locating ? 'جاري تحديد الموقع...' : coords ? 'تم حفظ الموقع الدقيق' : 'استخدام موقعي الحالي'}</Text>
+        <Text style={[styles.locationButtonText, coords && { color: '#16834A' }]}>{locating ? 'جاري تحديد الموقع والمدينة...' : coords ? (city ? `تم حفظ الموقع • ${city}` : 'تم حفظ الموقع الدقيق') : 'استخدام موقعي الحالي'}</Text>
       </Pressable>
 
       <View style={styles.switchRow}>
@@ -830,7 +848,11 @@ function EditListing({
       const permission = await Location.requestForegroundPermissionsAsync();
       if (!permission.granted) return Alert.alert('الموقع', 'اسمح للتطبيق بالوصول للموقع.');
       const current = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Balanced });
-      setCoords({ latitude: current.coords.latitude, longitude: current.coords.longitude });
+      const nextCoords = { latitude: current.coords.latitude, longitude: current.coords.longitude };
+      setCoords(nextCoords);
+      const detectedCity = await cityFromCoordinates(nextCoords);
+      if (detectedCity) setCity(detectedCity);
+      else Alert.alert('الموقع', 'تم حفظ الموقع الدقيق، لكن تعذر معرفة اسم المدينة تلقائيًا. يمكنك كتابتها يدويًا.');
     } catch {
       Alert.alert('الموقع', 'تعذر تحديد موقعك الآن.');
     } finally {
@@ -945,7 +967,7 @@ function EditListing({
 
       <TextInput style={styles.input} value={title} onChangeText={setTitle} placeholder="عنوان الإعلان" textAlign="right" />
       <TextInput style={[styles.input, styles.textarea]} value={description} onChangeText={setDescription} placeholder="وصف السلعة" multiline textAlignVertical="top" textAlign="right" />
-      <TextInput style={styles.input} value={city} onChangeText={setCity} placeholder="المدينة" textAlign="right" />
+      <TextInput style={styles.input} value={city} onChangeText={setCity} placeholder="المدينة — تُحدد تلقائيًا من الموقع" textAlign="right" />
 
       <Pressable style={[styles.locationButton, coords && styles.locationButtonDone]} onPress={useMyLocation} disabled={locating}>
         <Ionicons name={coords ? 'checkmark-circle' : 'navigate-outline'} size={21} color={coords ? '#16834A' : PURPLE} />
