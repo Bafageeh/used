@@ -26,7 +26,7 @@ Route::get('/', function () {
 HTML, 200, ['Content-Type' => 'text/html; charset=UTF-8']);
 });
 
-
+// Public legal URLs used by the mobile app and store listings.
 Route::get('/privacy', fn () => response()->file(public_path('privacy.html')));
 Route::get('/terms', fn () => response()->file(public_path('terms.html')));
 Route::get('/delete-account', fn () => response()->file(public_path('delete-account.html')));
