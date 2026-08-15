@@ -1,6 +1,6 @@
 name: Build Used APK Locally
 
-# build trigger: age gate + interactive map fixes 2026-08-15 10:40 +03
+# build trigger: automatic city from location 2026-08-15 11:12 +03
 on:
   workflow_dispatch:
     inputs:
