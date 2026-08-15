@@ -33,6 +33,11 @@
         "READ_MEDIA_IMAGES",
         "READ_MEDIA_VIDEO"
       ]
+    },
+    "extra": {
+      "eas": {
+        "projectId": "0ac8fdfb-fb44-4208-a80f-c7d390a887aa"
+      }
     }
   }
 }
