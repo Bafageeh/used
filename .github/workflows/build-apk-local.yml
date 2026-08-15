@@ -1,6 +1,6 @@
 name: Build Used APK Locally
 
-# build trigger: latest home UI 2026-08-15 04:10 +03
+# build trigger: store safety compliance 2026-08-15 10:17 +03
 on:
   workflow_dispatch:
     inputs:
