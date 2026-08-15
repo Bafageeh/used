@@ -1377,7 +1377,7 @@ export default function App() {
     <View style={styles.marketHeader}>
       <Text style={styles.marketTitle}>مستعمل مجاني</Text>
       <View style={styles.searchHeaderRow}>
-        <IconButton name="grid-outline" onPress={() => setMenuOpen(true)} />
+        <IconButton name={viewMode === 'list' ? 'grid-outline' : 'list-outline'} onPress={() => setViewMode((x) => x === 'list' ? 'grid' : 'list')} />
         <View style={styles.searchBox}>
           <Ionicons name="mic-outline" size={22} color={PURPLE} />
           <View style={styles.searchDivider} />
@@ -1420,21 +1420,6 @@ export default function App() {
     </ScrollView>
   );
 
-  const categoryTabs = (
-    <ScrollView horizontal style={styles.categoryScroller} showsHorizontalScrollIndicator={false} contentContainerStyle={styles.categoryTabs}>
-      <Pressable style={styles.categoryTab} onPress={() => setSelectedCategory(undefined)}>
-        <Text style={[styles.categoryTabText, selectedCategory === undefined && styles.categoryTabTextActive]}>الرئيسية</Text>
-        {selectedCategory === undefined ? <View style={styles.categoryUnderline} /> : null}
-      </Pressable>
-      {categories.slice(0, 7).map((category) => (
-        <Pressable key={category.id} style={styles.categoryTab} onPress={() => setSelectedCategory(category.id)}>
-          <Text style={[styles.categoryTabText, selectedCategory === category.id && styles.categoryTabTextActive]}>{category.name}</Text>
-          {selectedCategory === category.id ? <View style={styles.categoryUnderline} /> : null}
-        </Pressable>
-      ))}
-    </ScrollView>
-  );
-
   const toolbar = (
     <>
       <ScrollView horizontal style={styles.filterScroller} showsHorizontalScrollIndicator={false} contentContainerStyle={styles.filterRow}>
@@ -1454,9 +1439,6 @@ export default function App() {
         <Pressable style={[styles.filterChip, nearMode && styles.filterChipActive]} onPress={enableNearby} disabled={nearBusy}>
           {nearBusy ? <ActivityIndicator size="small" color={nearMode ? '#fff' : PURPLE} /> : <Ionicons name="locate-outline" size={19} color={nearMode ? '#fff' : PURPLE} />}
           <Text style={[styles.filterChipText, nearMode && styles.filterChipTextActive]}>القريب</Text>
-        </Pressable>
-        <Pressable style={styles.viewToggle} onPress={() => setViewMode((x) => x === 'list' ? 'grid' : 'list')}>
-          <Ionicons name={viewMode === 'list' ? 'grid-outline' : 'list-outline'} size={23} color={PURPLE} />
         </Pressable>
       </ScrollView>
 
@@ -1580,7 +1562,6 @@ export default function App() {
     <ScrollView contentContainerStyle={styles.homePage} keyboardShouldPersistTaps="handled">
       {header}
       {storyRow}
-      {categoryTabs}
       {toolbar}
       <View style={styles.resultsHeader}>
         <Text style={styles.resultCount}>{visibleListings.length} إعلان</Text>
