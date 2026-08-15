@@ -1,5 +1,6 @@
 name: Probe iOS EAS Final
 
+# rerun 2026-08-15 19:57 +03 after repository secret update
 on:
   push:
     branches: [main]
