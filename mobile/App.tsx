@@ -19,6 +19,7 @@ import * as FileSystem from 'expo-file-system/legacy';
 import * as Location from 'expo-location';
 import * as SecureStore from 'expo-secure-store';
 import AdminPanel from './AdminPanel';
+import LegalScreen from './LegalScreen';
 
 type Category = { id: number; name: string; slug?: string };
 type ListingImage = { id: number; url?: string; path?: string; original_url?: string; processed_url?: string | null; processing_status?: string };
@@ -65,7 +66,7 @@ type Conversation = {
   unread_count?: number;
 };
 type MessageNotification = ChatMessage & { conversation?: Conversation };
-type Screen = 'home' | 'favorites' | 'add' | 'notifications' | 'messages' | 'mine' | 'account' | 'admin';
+type Screen = 'home' | 'favorites' | 'add' | 'notifications' | 'messages' | 'mine' | 'account' | 'privacy' | 'terms' | 'admin';
 type ViewMode = 'list' | 'grid';
 type ItemCondition = 'new_good' | 'new_defect' | 'used_good' | 'used_defect';
 
@@ -397,6 +398,7 @@ function LoginPanel({ onLogin }: { onLogin: (token: string, user: User) => void 
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [busy, setBusy] = useState(false);
+  const [termsAccepted, setTermsAccepted] = useState(false);
 
   const normalizedPhone = () => {
     const digits = phone.replace(/\D/g, '');
@@ -433,6 +435,7 @@ function LoginPanel({ onLogin }: { onLogin: (token: string, user: User) => void 
   const sendRegistrationOtp = async () => {
     setBusy(true);
     try {
+      if (!termsAccepted) throw new Error('يجب الموافقة على الشروط والأحكام وسياسة الخصوصية أولاً.');
       const normalized = normalizedPhone();
       if (!name.trim()) throw new Error('أدخل اسمك.');
       if (!/^\d{4,8}$/.test(pin)) throw new Error('اختر رقمًا سريًا من 4 إلى 8 أرقام.');
@@ -453,6 +456,7 @@ function LoginPanel({ onLogin }: { onLogin: (token: string, user: User) => void 
   const verifyRegistrationOtp = async () => {
     setBusy(true);
     try {
+      if (!termsAccepted) throw new Error('يجب الموافقة على الشروط والأحكام وسياسة الخصوصية أولاً.');
       const normalized = normalizedPhone();
       if (!name.trim()) throw new Error('أدخل اسمك.');
       if (!/^\d{4,8}$/.test(pin)) throw new Error('اختر رقمًا سريًا من 4 إلى 8 أرقام.');
@@ -518,6 +522,14 @@ function LoginPanel({ onLogin }: { onLogin: (token: string, user: User) => void 
         <View style={styles.inputShell}><Ionicons name="person-outline" size={20} color={MUTED} /><TextInput style={styles.inputInner} value={name} onChangeText={setName} placeholder="الاسم" textAlign="right" editable={!otpSent} /></View>
         <View style={styles.inputShell}><Ionicons name="logo-whatsapp" size={20} color={MUTED} /><TextInput style={styles.inputInner} value={phone} onChangeText={setPhone} placeholder="05xxxxxxxx" keyboardType="phone-pad" textAlign="right" editable={!otpSent} /></View>
         <View style={styles.inputShell}><Ionicons name="lock-closed-outline" size={20} color={MUTED} /><TextInput style={styles.inputInner} value={pin} onChangeText={setPin} placeholder="اختر رقمًا سريًا من 4 إلى 8 أرقام" keyboardType="number-pad" secureTextEntry textAlign="right" editable={!otpSent} /></View>
+        <Pressable onPress={() => !otpSent && setTermsAccepted((x) => !x)} disabled={otpSent} style={{ minHeight:48, borderRadius:13, borderWidth:1, borderColor:termsAccepted?PURPLE:'#D8D2DF', backgroundColor:termsAccepted?PURPLE_LIGHT:'#fff', paddingHorizontal:12, flexDirection:'row-reverse', alignItems:'center', gap:9, marginBottom:7 }}>
+          <Ionicons name={termsAccepted ? 'checkbox' : 'square-outline'} size={23} color={PURPLE} />
+          <Text style={{ flex:1, textAlign:'right', color:TEXT, fontSize:12, fontWeight:'800' }}>أوافق على الشروط والأحكام وسياسة الخصوصية</Text>
+        </Pressable>
+        <View style={{ flexDirection:'row-reverse', justifyContent:'center', gap:18, marginBottom:10 }}>
+          <Pressable onPress={() => void Linking.openURL(`${SITE_URL}/terms`)}><Text style={{ color:PURPLE, fontSize:11, fontWeight:'900', textDecorationLine:'underline' }}>الشروط والأحكام</Text></Pressable>
+          <Pressable onPress={() => void Linking.openURL(`${SITE_URL}/privacy`)}><Text style={{ color:PURPLE, fontSize:11, fontWeight:'900', textDecorationLine:'underline' }}>سياسة الخصوصية</Text></Pressable>
+        </View>
         {otpSent ? <>
           <View style={styles.inputShell}><Ionicons name="chatbubble-ellipses-outline" size={20} color={MUTED} /><TextInput style={styles.inputInner} value={otp} onChangeText={setOtp} placeholder="رمز OTP المرسل على واتساب" keyboardType="number-pad" maxLength={6} textAlign="right" /></View>
           <Text style={[styles.help, { marginTop: 0 }]}>أدخل الرمز خلال 5 دقائق. إذا لم يصلك، يمكنك طلب رمز جديد بعد دقيقة.</Text>
@@ -1352,6 +1364,21 @@ export default function App() {
     unreadBaseline.current = null;
     setScreen('home');
   };
+
+  const deleteAccount = () => {
+    Alert.alert('حذف الحساب نهائيًا', 'سيتم حذف حسابك وإعلاناتك وصورك وفيديوهاتك ورسائلك المرتبطة بالحساب. لا يمكن التراجع عن هذه العملية. هل أنت متأكد؟', [
+      { text: 'إلغاء', style: 'cancel' },
+      { text: 'حذف الحساب', style: 'destructive', onPress: async () => {
+        try {
+          await request('/account', { method: 'DELETE' }, token);
+          logout();
+          Alert.alert('تم حذف الحساب', 'تم حذف حسابك والبيانات المرتبطة به بنجاح.');
+        } catch (e) {
+          Alert.alert('تعذر حذف الحساب', e instanceof Error ? e.message : 'حدث خطأ غير متوقع.');
+        }
+      } },
+    ]);
+  };
   const published = () => { setEditListing(null); setRefreshKey((x) => x + 1); setScreen('home'); setTimeout(() => setRefreshKey((x) => x + 1), 4000); setTimeout(() => setRefreshKey((x) => x + 1), 10000); };
   const resetFilters = () => {
     setSelectedCategory(undefined);
@@ -1606,9 +1633,14 @@ export default function App() {
         <Text style={styles.accountPhone}>{user.phone}</Text>
       </View>
       <Pressable style={styles.menuAction} onPress={() => setScreen('mine')}><Ionicons name="albums-outline" size={22} color={PURPLE} /><Text style={styles.menuActionText}>إعلاناتي</Text><Ionicons name="chevron-back" size={20} color="#A1A1AA" /></Pressable>
-      <Pressable style={styles.dangerButton} onPress={logout}><Ionicons name="log-out-outline" size={20} color="#DC2626" /><Text style={styles.dangerText}>تسجيل الخروج</Text></Pressable>
+      <Pressable style={styles.menuAction} onPress={() => setScreen('privacy')}><Ionicons name="shield-checkmark-outline" size={22} color={PURPLE} /><Text style={styles.menuActionText}>سياسة الخصوصية</Text><Ionicons name="chevron-back" size={20} color="#A1A1AA" /></Pressable>
+      <Pressable style={styles.menuAction} onPress={() => setScreen('terms')}><Ionicons name="document-text-outline" size={22} color={PURPLE} /><Text style={styles.menuActionText}>الشروط والأحكام</Text><Ionicons name="chevron-back" size={20} color="#A1A1AA" /></Pressable>
+      <Pressable style={styles.dangerButton} onPress={deleteAccount}><Ionicons name="trash-outline" size={20} color="#DC2626" /><Text style={styles.dangerText}>حذف الحساب نهائيًا</Text></Pressable>
+      <Pressable style={[styles.dangerButton, { borderColor:'#D8D2DF', backgroundColor:'#fff' }]} onPress={logout}><Ionicons name="log-out-outline" size={20} color={MUTED} /><Text style={[styles.dangerText, { color:MUTED }]}>تسجيل الخروج</Text></Pressable>
     </ScrollView>
   ) : <LoginPanel onLogin={loggedIn} />;
+  if (screen === 'privacy') content = <LegalScreen type="privacy" />;
+  if (screen === 'terms') content = <LegalScreen type="terms" />;
   if (screen === 'admin') content = token && user?.role === 'admin' ? <AdminPanel token={token} /> : <LoginPanel onLogin={loggedIn} />;
 
   const isHome = screen === 'home';
@@ -1618,7 +1650,7 @@ export default function App() {
       {!isHome ? (
         <View style={styles.simpleTopBar}>
           <IconButton name="menu-outline" onPress={() => setMenuOpen(true)} />
-          <Text style={styles.simpleTopTitle}>{screen === 'favorites' ? 'المفضلة' : screen === 'add' ? (editListing ? 'تعديل الإعلان' : 'أضف إعلان') : screen === 'notifications' ? 'الإشعارات' : screen === 'messages' ? 'الرسائل' : screen === 'mine' ? 'إعلاناتي' : screen === 'admin' ? 'لوحة الإدارة' : 'حسابي'}</Text>
+          <Text style={styles.simpleTopTitle}>{screen === 'favorites' ? 'المفضلة' : screen === 'add' ? (editListing ? 'تعديل الإعلان' : 'أضف إعلان') : screen === 'notifications' ? 'الإشعارات' : screen === 'messages' ? 'الرسائل' : screen === 'mine' ? 'إعلاناتي' : screen === 'privacy' ? 'سياسة الخصوصية' : screen === 'terms' ? 'الشروط والأحكام' : screen === 'admin' ? 'لوحة الإدارة' : 'حسابي'}</Text>
           <Pressable style={styles.simpleHomeButton} onPress={() => setScreen('home')}><Ionicons name="home-outline" size={24} color="#fff" /></Pressable>
         </View>
       ) : null}
@@ -1698,6 +1730,8 @@ export default function App() {
               ['mine', 'albums-outline', 'إعلاناتي'],
               ['account', 'person-outline', user ? 'حسابي' : 'تسجيل الدخول'],
               ['favorites', 'heart-outline', 'المفضلة'],
+              ['privacy', 'shield-checkmark-outline', 'سياسة الخصوصية'],
+              ['terms', 'document-text-outline', 'الشروط والأحكام'],
             ] as [Screen, any, string][]).map(([key, icon, label]) => (
               <Pressable key={key} style={styles.sideMenuItem} onPress={() => { setScreen(key); setMenuOpen(false); }}><Ionicons name={icon} size={22} color={PURPLE} /><Text style={styles.sideMenuText}>{label}</Text><Ionicons name="chevron-back" size={18} color="#A1A1AA" /></Pressable>
             ))}

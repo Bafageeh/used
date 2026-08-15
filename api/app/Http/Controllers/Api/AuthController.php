@@ -9,6 +9,7 @@ use App\Services\WhatsAppOtpService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
 use Throwable;
@@ -112,5 +113,34 @@ class AuthController extends Controller
     }
 
     public function me(Request $request) { return $request->user(); }
+
+    public function destroyAccount(Request $request)
+    {
+        $user = $request->user();
+        abort_if($user->role === 'admin', 403, 'لا يمكن حذف حساب الإدارة من التطبيق.');
+
+        $user->load(['listings.images']);
+        $paths = [];
+        foreach ($user->listings as $listing) {
+            foreach ($listing->images as $image) {
+                if ($image->path) $paths[] = $image->path;
+                if ($image->processed_path) $paths[] = $image->processed_path;
+            }
+            if ($listing->video_path) $paths[] = $listing->video_path;
+        }
+
+        DB::transaction(function () use ($user) {
+            OtpCode::where('phone', $user->phone)->delete();
+            $user->tokens()->delete();
+            $user->delete();
+        });
+
+        foreach (array_unique(array_filter($paths)) as $path) {
+            Storage::disk('public')->delete($path);
+        }
+
+        return response()->noContent();
+    }
+
     public function logout(Request $request) { $request->user()->currentAccessToken()?->delete(); return response()->noContent(); }
 }

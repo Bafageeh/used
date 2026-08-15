@@ -19,7 +19,7 @@ Route::post('/auth/login',[AuthController::class,'loginWithPin'])->middleware('t
 Route::post('/auth/admin-login',[AuthController::class,'adminLogin'])->middleware('throttle:10,1');
 
 Route::middleware('auth:sanctum')->group(function () {
-    Route::get('/me',[AuthController::class,'me']); Route::post('/logout',[AuthController::class,'logout']);
+    Route::get('/me',[AuthController::class,'me']); Route::post('/logout',[AuthController::class,'logout']); Route::delete('/account',[AuthController::class,'destroyAccount']);
     Route::get('/my/listings',[ListingController::class,'mine']); Route::post('/listings',[ListingController::class,'store']);
     Route::patch('/listings/{listing}',[ListingController::class,'update']); Route::post('/listings/{listing}/refresh',[ListingController::class,'refresh']);
     Route::delete('/listings/{listing}',[ListingController::class,'destroy']); Route::post('/listings/{listing}/images',[ListingImageController::class,'store']);
