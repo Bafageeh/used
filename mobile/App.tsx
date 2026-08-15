@@ -20,6 +20,8 @@ import * as Location from 'expo-location';
 import * as SecureStore from 'expo-secure-store';
 import AdminPanel from './AdminPanel';
 import LegalScreen from './LegalScreen';
+import AgeGate, { AGE_GATE_KEY } from './AgeGate';
+import { BlockedUsersPanel, ChatSafetyActions, ListingSafetyActions, ReportMessageButton } from './Moderation';
 
 type Category = { id: number; name: string; slug?: string };
 type ListingImage = { id: number; url?: string; path?: string; original_url?: string; processed_url?: string | null; processing_status?: string };
@@ -66,7 +68,7 @@ type Conversation = {
   unread_count?: number;
 };
 type MessageNotification = ChatMessage & { conversation?: Conversation };
-type Screen = 'home' | 'favorites' | 'add' | 'notifications' | 'messages' | 'mine' | 'account' | 'privacy' | 'terms' | 'admin';
+type Screen = 'home' | 'favorites' | 'add' | 'notifications' | 'messages' | 'mine' | 'account' | 'blocked' | 'privacy' | 'terms' | 'admin';
 type ViewMode = 'list' | 'grid';
 type ItemCondition = 'new_good' | 'new_defect' | 'used_good' | 'used_defect';
 
@@ -1054,12 +1056,14 @@ function ChatPanel({ token, userId, conversation, onBack, onUnreadChanged }: { t
                 <View style={[styles.messageBubble, mine ? styles.messageBubbleMine : styles.messageBubbleOther]}>
                   <Text style={[styles.messageText, mine && styles.messageTextMine]}>{message.body}</Text>
                   <Text style={[styles.messageTime, mine && styles.messageTimeMine]}>{relativeTime(message.created_at)}</Text>
+                  {!mine ? <ReportMessageButton token={token} messageId={message.id} /> : null}
                 </View>
               </View>
             );
           }) : <Text style={styles.chatStartHint}>ابدأ المحادثة حول هذه السلعة.</Text>}
         </ScrollView>
       )}
+      <ChatSafetyActions token={token} userId={userId} conversation={meta} onBlocked={onBack} />
       <View style={styles.messageComposer}>
         <Pressable style={[styles.sendButton, (!draft.trim() || sending) && styles.disabled]} onPress={send} disabled={!draft.trim() || sending}>
           {sending ? <ActivityIndicator size="small" color="#fff" /> : <Ionicons name="send" size={20} color="#fff" />}
@@ -1128,6 +1132,7 @@ export default function App() {
   const [token, setToken] = useState('');
   const [user, setUser] = useState<User | null>(null);
   const [authRestoring, setAuthRestoring] = useState(true);
+  const [ageAllowed, setAgeAllowed] = useState<boolean | null>(null);
   const [mine, setMine] = useState<Listing[]>([]);
   const [mineLoading, setMineLoading] = useState(false);
   const [detail, setDetail] = useState<Listing | null>(null);
@@ -1166,7 +1171,7 @@ export default function App() {
     try {
       const [cats, result] = await Promise.all([
         request<Category[]>('/categories'),
-        request<Paginated<Listing>>(listingsPath),
+        request<Paginated<Listing>>(listingsPath, {}, token || undefined),
       ]);
       const nextListings = Array.isArray(result?.data) ? result.data : [];
       setCategories(Array.isArray(cats) ? cats : []);
@@ -1176,9 +1181,13 @@ export default function App() {
     } finally {
       setLoading(false);
     }
-  }, [listingsPath]);
+  }, [listingsPath, token]);
 
   useEffect(() => { loadHome(); }, [loadHome, refreshKey]);
+
+  useEffect(() => {
+    SecureStore.getItemAsync(AGE_GATE_KEY).then((value) => setAgeAllowed(value === 'yes')).catch(() => setAgeAllowed(false));
+  }, []);
 
   useEffect(() => {
     let active = true;
@@ -1484,6 +1493,9 @@ export default function App() {
     </>
   );
 
+  if (ageAllowed === null) return <View style={styles.center}><ActivityIndicator size="large" color={PURPLE} /><Text style={styles.stateText}>جاري التحقق...</Text></View>;
+  if (!ageAllowed) return <AgeGate onAllowed={() => setAgeAllowed(true)} />;
+
   if (detailLoading) return <View style={styles.center}><ActivityIndicator size="large" color={PURPLE} /><Text style={styles.stateText}>جاري فتح الإعلان...</Text></View>;
 
   if (detail) {
@@ -1546,6 +1558,8 @@ export default function App() {
                 <Text style={styles.contactSellerText}>مراسلة المعلن</Text>
               </Pressable>
             ) : null}
+
+            {!isOwner && detail.user && token ? <ListingSafetyActions token={token} listingId={detail.id} userId={detail.user.id} onBlocked={() => { setListings((current) => current.filter((x) => x.user?.id !== detail.user?.id)); setDetail(null); setRefreshKey((x) => x + 1); }} /> : null}
 
             {isOwner ? (
               <View style={styles.ownerManageSection}>
@@ -1633,12 +1647,14 @@ export default function App() {
         <Text style={styles.accountPhone}>{user.phone}</Text>
       </View>
       <Pressable style={styles.menuAction} onPress={() => setScreen('mine')}><Ionicons name="albums-outline" size={22} color={PURPLE} /><Text style={styles.menuActionText}>إعلاناتي</Text><Ionicons name="chevron-back" size={20} color="#A1A1AA" /></Pressable>
+      <Pressable style={styles.menuAction} onPress={() => setScreen('blocked')}><Ionicons name="ban-outline" size={22} color={PURPLE} /><Text style={styles.menuActionText}>المستخدمون المحظورون</Text><Ionicons name="chevron-back" size={20} color="#A1A1AA" /></Pressable>
       <Pressable style={styles.menuAction} onPress={() => setScreen('privacy')}><Ionicons name="shield-checkmark-outline" size={22} color={PURPLE} /><Text style={styles.menuActionText}>سياسة الخصوصية</Text><Ionicons name="chevron-back" size={20} color="#A1A1AA" /></Pressable>
       <Pressable style={styles.menuAction} onPress={() => setScreen('terms')}><Ionicons name="document-text-outline" size={22} color={PURPLE} /><Text style={styles.menuActionText}>الشروط والأحكام</Text><Ionicons name="chevron-back" size={20} color="#A1A1AA" /></Pressable>
       <Pressable style={styles.dangerButton} onPress={deleteAccount}><Ionicons name="trash-outline" size={20} color="#DC2626" /><Text style={styles.dangerText}>حذف الحساب نهائيًا</Text></Pressable>
       <Pressable style={[styles.dangerButton, { borderColor:'#D8D2DF', backgroundColor:'#fff' }]} onPress={logout}><Ionicons name="log-out-outline" size={20} color={MUTED} /><Text style={[styles.dangerText, { color:MUTED }]}>تسجيل الخروج</Text></Pressable>
     </ScrollView>
   ) : <LoginPanel onLogin={loggedIn} />;
+  if (screen === 'blocked') content = token ? <BlockedUsersPanel token={token} /> : <LoginPanel onLogin={loggedIn} />;
   if (screen === 'privacy') content = <LegalScreen type="privacy" />;
   if (screen === 'terms') content = <LegalScreen type="terms" />;
   if (screen === 'admin') content = token && user?.role === 'admin' ? <AdminPanel token={token} /> : <LoginPanel onLogin={loggedIn} />;
@@ -1650,7 +1666,7 @@ export default function App() {
       {!isHome ? (
         <View style={styles.simpleTopBar}>
           <IconButton name="menu-outline" onPress={() => setMenuOpen(true)} />
-          <Text style={styles.simpleTopTitle}>{screen === 'favorites' ? 'المفضلة' : screen === 'add' ? (editListing ? 'تعديل الإعلان' : 'أضف إعلان') : screen === 'notifications' ? 'الإشعارات' : screen === 'messages' ? 'الرسائل' : screen === 'mine' ? 'إعلاناتي' : screen === 'privacy' ? 'سياسة الخصوصية' : screen === 'terms' ? 'الشروط والأحكام' : screen === 'admin' ? 'لوحة الإدارة' : 'حسابي'}</Text>
+          <Text style={styles.simpleTopTitle}>{screen === 'favorites' ? 'المفضلة' : screen === 'add' ? (editListing ? 'تعديل الإعلان' : 'أضف إعلان') : screen === 'notifications' ? 'الإشعارات' : screen === 'messages' ? 'الرسائل' : screen === 'mine' ? 'إعلاناتي' : screen === 'blocked' ? 'المستخدمون المحظورون' : screen === 'privacy' ? 'سياسة الخصوصية' : screen === 'terms' ? 'الشروط والأحكام' : screen === 'admin' ? 'لوحة الإدارة' : 'حسابي'}</Text>
           <Pressable style={styles.simpleHomeButton} onPress={() => setScreen('home')}><Ionicons name="home-outline" size={24} color="#fff" /></Pressable>
         </View>
       ) : null}
@@ -1730,6 +1746,7 @@ export default function App() {
               ['mine', 'albums-outline', 'إعلاناتي'],
               ['account', 'person-outline', user ? 'حسابي' : 'تسجيل الدخول'],
               ['favorites', 'heart-outline', 'المفضلة'],
+              ['blocked', 'ban-outline', 'المستخدمون المحظورون'],
               ['privacy', 'shield-checkmark-outline', 'سياسة الخصوصية'],
               ['terms', 'document-text-outline', 'الشروط والأحكام'],
             ] as [Screen, any, string][]).map(([key, icon, label]) => (

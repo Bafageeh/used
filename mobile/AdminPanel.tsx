@@ -9,11 +9,12 @@ const TEXT = '#18181B';
 const MUTED = '#71717A';
 const BORDER = '#E7E2EF';
 
-type Tab = 'dashboard'|'users'|'listings'|'categories'|'settings';
+type Tab = 'dashboard'|'users'|'listings'|'reports'|'categories'|'settings';
 type User = { id:number; name:string; username?:string|null; phone?:string|null; email?:string|null; role:string; is_active:boolean };
 type Listing = { id:number; title:string; status:string; city:string; price?:string|number|null; user?:{name:string;phone?:string|null;username?:string|null}; category?:{name:string} };
 type Category = { id:number; name:string; is_active?:boolean };
 type Setting = { key:string; value?:string|null; label?:string|null; group:string; type:string };
+type Report = { id:number; target_type:string; reason:string; details?:string|null; status:string; created_at?:string; reported_user_id?:number|null; reported_user_name?:string|null; listing_id?:number|null; listing_title?:string|null; listing_status?:string|null; message_id?:number|null; message_body?:string|null; reporter_name?:string|null };
 
 async function api<T>(path:string, token:string, init:RequestInit={}) : Promise<T> {
   const res = await fetch(`${API}${path}`, { ...init, headers: { Accept:'application/json','Content-Type':'application/json',Authorization:`Bearer ${token}`,...(init.headers||{}) } });
@@ -24,7 +25,7 @@ async function api<T>(path:string, token:string, init:RequestInit={}) : Promise<
 
 export default function AdminPanel({ token }: { token:string }) {
   const [tab,setTab]=useState<Tab>('dashboard'); const [busy,setBusy]=useState(false);
-  const [dash,setDash]=useState<any>({}); const [users,setUsers]=useState<User[]>([]); const [listings,setListings]=useState<Listing[]>([]); const [categories,setCategories]=useState<Category[]>([]); const [settings,setSettings]=useState<Setting[]>([]);
+  const [dash,setDash]=useState<any>({}); const [users,setUsers]=useState<User[]>([]); const [listings,setListings]=useState<Listing[]>([]); const [reports,setReports]=useState<Report[]>([]); const [categories,setCategories]=useState<Category[]>([]); const [settings,setSettings]=useState<Setting[]>([]);
   const [q,setQ]=useState(''); const [editUser,setEditUser]=useState<User|null>(null); const [newUser,setNewUser]=useState(false);
   const [uf,setUf]=useState({name:'',username:'',phone:'',email:'',password:'',pin:'',role:'user',is_active:true});
   const [catName,setCatName]=useState('');
@@ -36,6 +37,7 @@ export default function AdminPanel({ token }: { token:string }) {
       if(tab==='dashboard') setDash(await api('/admin/dashboard',token));
       if(tab==='users') { const r=await api<{data:User[]}>(`/admin/users${q?`?q=${encodeURIComponent(q)}`:''}`,token); setUsers(r.data||[]); }
       if(tab==='listings') { const r=await api<{data:Listing[]}>(`/admin/listings${q?`?q=${encodeURIComponent(q)}`:''}`,token); setListings(r.data||[]); }
+      if(tab==='reports') { const r=await api<{data:Report[]}>('/admin/reports',token); setReports(r.data||[]); }
       if(tab==='categories') { const r=await api<Category[]>('/categories',token); setCategories(Array.isArray(r)?r:[]); }
       if(tab==='settings') setSettings(await api<Setting[]>('/admin/settings',token));
     } catch(e){ Alert.alert('الإدارة',e instanceof Error?e.message:'تعذر التحميل'); } finally { setBusy(false); }
@@ -47,6 +49,7 @@ export default function AdminPanel({ token }: { token:string }) {
   const removeUser=(u:User)=>Alert.alert('حذف الحساب',`حذف ${u.name} وجميع إعلاناته؟`,[{text:'إلغاء',style:'cancel'},{text:'حذف نهائي',style:'destructive',onPress:async()=>{try{await api(`/admin/users/${u.id}`,token,{method:'DELETE'});await load();}catch(e){Alert.alert('الحذف',e instanceof Error?e.message:'تعذر الحذف');}}}]);
   const patchUser=async(u:User,body:any)=>{try{await api(`/admin/users/${u.id}`,token,{method:'PATCH',body:JSON.stringify(body)});await load();}catch(e){Alert.alert('الحساب',e instanceof Error?e.message:'تعذر التعديل');}};
   const patchListing=async(l:Listing,status:string)=>{try{await api(`/admin/listings/${l.id}`,token,{method:'PATCH',body:JSON.stringify({status})});await load();}catch(e){Alert.alert('الإعلان',e instanceof Error?e.message:'تعذر التعديل');}};
+  const moderateReport=async(r:Report,status:'resolved'|'dismissed',action:'none'|'archive_listing'|'suspend_user'='none')=>{try{await api(`/admin/reports/${r.id}`,token,{method:'PATCH',body:JSON.stringify({status,action})});await load();}catch(e){Alert.alert('البلاغ',e instanceof Error?e.message:'تعذر تحديث البلاغ');}};
   const removeListing=(l:Listing)=>Alert.alert('حذف الإعلان',`حذف «${l.title}» نهائيًا؟`,[{text:'إلغاء',style:'cancel'},{text:'حذف',style:'destructive',onPress:async()=>{try{await api(`/admin/listings/${l.id}`,token,{method:'DELETE'});await load();}catch(e){Alert.alert('الحذف',e instanceof Error?e.message:'تعذر الحذف');}}}]);
   const saveCategory=async()=>{const name=catName.trim();if(!name)return Alert.alert('التصنيف','اكتب اسم التصنيف.');try{if(editingCategory){await api(`/admin/categories/${editingCategory.id}`,token,{method:'PATCH',body:JSON.stringify({name})});}else{await api('/admin/categories',token,{method:'POST',body:JSON.stringify({name})});}setCatName('');setEditingCategory(null);await load();}catch(e){Alert.alert('التصنيف',e instanceof Error?e.message:'تعذر الحفظ');}};
   const beginCategoryEdit=(c:Category)=>{setEditingCategory(c);setCatName(c.name);};
@@ -55,7 +58,7 @@ export default function AdminPanel({ token }: { token:string }) {
   const saveSetting=async(s:Setting)=>{try{await api(`/admin/settings/${encodeURIComponent(s.key)}`,token,{method:'PATCH',body:JSON.stringify({value:s.value??'',label:s.label,group:s.group,type:s.type})});Alert.alert('الإعدادات','تم الحفظ');}catch(e){Alert.alert('الإعدادات',e instanceof Error?e.message:'تعذر الحفظ');}};
   const addSetting=async()=>{try{await api('/admin/settings',token,{method:'POST',body:JSON.stringify(newSetting)});setNewSetting({key:'',value:'',label:'',group:'general',type:'text'});await load();}catch(e){Alert.alert('الإعدادات',e instanceof Error?e.message:'تعذر الإضافة');}};
 
-  const tabs:[Tab,string,any][]=[['dashboard','الرئيسية','speedometer-outline'],['users','الحسابات','people-outline'],['listings','الإعلانات','albums-outline'],['categories','التصنيفات','grid-outline'],['settings','الإعدادات','settings-outline']];
+  const tabs:[Tab,string,any][]=[['dashboard','الرئيسية','speedometer-outline'],['users','الحسابات','people-outline'],['listings','الإعلانات','albums-outline'],['reports','البلاغات','flag-outline'],['categories','التصنيفات','grid-outline'],['settings','الإعدادات','settings-outline']];
   return <View style={s.root}>
     <View style={s.hero}><View><Text style={s.heroTitle}>لوحة الإدارة</Text><Text style={s.heroSub}>تحكم كامل بمستعمل مجاني</Text></View><View style={s.shield}><Ionicons name="shield-checkmark" size={28} color="#fff"/></View></View>
     <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={s.tabs}>{tabs.map(([k,l,i])=><Pressable key={k} onPress={()=>{setQ('');setTab(k)}} style={[s.tab,tab===k&&s.tabOn]}><Ionicons name={i} size={18} color={tab===k?'#fff':P}/><Text style={[s.tabText,tab===k&&s.tabTextOn]}>{l}</Text></Pressable>)}</ScrollView>
@@ -71,6 +74,8 @@ export default function AdminPanel({ token }: { token:string }) {
       </View>:null}
 
       {tab==='listings'?<View><Text style={s.title}>إدارة الإعلانات</Text><TextInput value={q} onChangeText={setQ} onSubmitEditing={load} placeholder="بحث في الإعلانات" style={s.search} textAlign="right"/>{listings.map(l=><View key={l.id} style={s.card}><Text style={s.cardTitle}>{l.title}</Text><Text style={s.meta}>{l.user?.name||'بدون بائع'} • {l.city} • {l.status}</Text><View style={s.actionRow}><Pressable style={s.small} onPress={()=>patchListing(l,'published')}><Text style={s.smallText}>نشر</Text></Pressable><Pressable style={s.small} onPress={()=>patchListing(l,'sold')}><Text style={s.smallText}>مباع</Text></Pressable><Pressable style={s.small} onPress={()=>patchListing(l,'archived')}><Text style={s.smallText}>أرشفة</Text></Pressable><Pressable style={s.del} onPress={()=>removeListing(l)}><Text style={s.delText}>حذف</Text></Pressable></View></View>)}</View>:null}
+
+      {tab==='reports'?<View><Text style={s.title}>بلاغات المحتوى والمستخدمين</Text><Text style={s.meta}>يجب مراجعة البلاغات واتخاذ إجراء مناسب في الوقت المناسب.</Text>{reports.length?reports.map(r=><View key={r.id} style={s.card}><View style={s.cardTop}><View style={[s.badge,s.bad]}><Text style={[s.badgeText,{color:'#B91C1C'}]}>بلاغ #{r.id}</Text></View><View style={{flex:1,alignItems:'flex-end'}}><Text style={s.cardTitle}>{r.target_type==='listing'?`إعلان: ${r.listing_title||r.listing_id}`:r.target_type==='message'?'رسالة في المحادثة':`مستخدم: ${r.reported_user_name||r.reported_user_id}`}</Text><Text style={s.meta}>السبب: {r.reason} • المبلّغ: {r.reporter_name||'مستخدم'}</Text>{r.message_body?<Text numberOfLines={3} style={s.meta}>{r.message_body}</Text>:null}{r.details?<Text numberOfLines={3} style={s.meta}>{r.details}</Text>:null}</View></View><View style={s.actionRow}>{r.listing_id?<Pressable style={s.small} onPress={()=>moderateReport(r,'resolved','archive_listing')}><Text style={s.smallText}>أرشفة الإعلان</Text></Pressable>:null}{r.reported_user_id?<Pressable style={s.del} onPress={()=>moderateReport(r,'resolved','suspend_user')}><Text style={s.delText}>إيقاف المستخدم</Text></Pressable>:null}<Pressable style={s.small} onPress={()=>moderateReport(r,'resolved','none')}><Text style={s.smallText}>إغلاق البلاغ</Text></Pressable><Pressable style={s.cancel} onPress={()=>moderateReport(r,'dismissed','none')}><Text>رفض البلاغ</Text></Pressable></View></View>):<Text style={s.meta}>لا توجد بلاغات معلقة.</Text>}</View>:null}
 
       {tab==='categories'?<View><Text style={s.title}>التصنيفات</Text><View style={s.editor}><TextInput value={catName} onChangeText={setCatName} placeholder={editingCategory?'تعديل اسم التصنيف':'اسم التصنيف'} style={s.input} textAlign="right" returnKeyType="done" onSubmitEditing={saveCategory}/><Pressable style={s.save} onPress={saveCategory}><Text style={s.saveText}>{editingCategory?'حفظ التعديل':'إضافة تصنيف'}</Text></Pressable>{editingCategory?<Pressable style={s.cancel} onPress={cancelCategoryEdit}><Text>إلغاء التعديل</Text></Pressable>:null}</View>{categories.map(c=><View key={c.id} style={s.simpleRow}><View style={{flexDirection:'row',gap:18,alignItems:'center'}}><Pressable onPress={()=>beginCategoryEdit(c)} accessibilityLabel={`تعديل ${c.name}`}><Ionicons name="create-outline" size={21} color={P}/></Pressable><Pressable onPress={()=>removeCategory(c)} accessibilityLabel={`حذف ${c.name}`}><Ionicons name="trash-outline" size={20} color="#DC2626"/></Pressable></View><View style={{flex:1,alignItems:'flex-end'}}><Text style={s.cardTitle}>{c.name}</Text></View></View>)}</View>:null}
 

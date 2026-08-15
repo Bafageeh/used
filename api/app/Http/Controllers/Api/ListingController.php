@@ -4,15 +4,20 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Models\Listing;
+use App\Services\ContentSafety;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Validation\Rule;
 
 class ListingController extends Controller
 {
  public function index(Request $request) {
+  $viewerId = auth('sanctum')->id();
+  $blocked = $this->blockedUserIds($viewerId);
   return Listing::query()->with(['category:id,name,slug','images:id,listing_id,path,sort_order','user:id,name'])
    ->where('status','published')
+   ->when($blocked, fn ($q) => $q->whereNotIn('user_id', $blocked))
    ->when($request->filled('q'), function ($query) use ($request) {
     $term='%'.$request->string('q')->trim().'%';
     $query->where(function ($inner) use ($term) { $inner->where('title','like',$term)->orWhere('description','like',$term); });
@@ -22,8 +27,10 @@ class ListingController extends Controller
    ->latest('published_at')->paginate(20);
  }
  public function show(Listing $listing) {
-  abort_unless($listing->status==='published' || auth('sanctum')->id()===$listing->user_id,404);
-  if ($listing->status === 'published' && auth('sanctum')->id() !== $listing->user_id) $listing->increment('views_count');
+  $viewerId = auth('sanctum')->id();
+  abort_unless($listing->status==='published' || $viewerId===$listing->user_id,404);
+  if ($viewerId && $viewerId !== $listing->user_id && $this->blockedBetween($viewerId, $listing->user_id)) abort(404);
+  if ($listing->status === 'published' && $viewerId !== $listing->user_id) $listing->increment('views_count');
   $listing->load(['category','images','user:id,name,phone']);
   if (!$listing->show_phone) $listing->user->makeHidden('phone');
   return $listing;
@@ -31,14 +38,16 @@ class ListingController extends Controller
  public function mine(Request $request) {
   return $request->user()->listings()->with(['category:id,name,slug','images'])->latest()->paginate(20);
  }
- public function store(Request $request) {
-  $data=$this->validated($request); $data['price']=null; $data['user_id']=$request->user()->id;
+ public function store(Request $request, ContentSafety $safety) {
+  $data=$this->validated($request); $safety->ensureAllowed($data['title'],$data['description']);
+  $data['price']=null; $data['user_id']=$request->user()->id;
   $data['item_condition']=$data['item_condition'] ?? 'used_good';
   $data['published_at']=$data['status']==='published'?now():null;
   return response()->json(Listing::create($data),201);
  }
- public function update(Request $request, Listing $listing) {
-  abort_unless($request->user()->id===$listing->user_id,403); $data=$this->validated($request); $data['price']=null;
+ public function update(Request $request, Listing $listing, ContentSafety $safety) {
+  abort_unless($request->user()->id===$listing->user_id,403); $data=$this->validated($request);
+  $safety->ensureAllowed($data['title'],$data['description']); $data['price']=null;
   if (($data['status'] ?? null)==='published' && !$listing->published_at) $data['published_at']=now();
   $listing->update($data); return $listing->fresh(['category','images']);
  }
@@ -65,5 +74,14 @@ class ListingController extends Controller
    'longitude'=>['nullable','numeric','between:-180,180'],'status'=>['required',Rule::in(['draft','published','sold','archived'])],
    'show_phone'=>['sometimes','boolean'],
   ]);
+ }
+ private function blockedUserIds(?int $userId): array {
+  if (!$userId) return [];
+  $a=DB::table('user_blocks')->where('blocker_id',$userId)->pluck('blocked_id')->all();
+  $b=DB::table('user_blocks')->where('blocked_id',$userId)->pluck('blocker_id')->all();
+  return array_values(array_unique(array_map('intval',array_merge($a,$b))));
+ }
+ private function blockedBetween(int $a, int $b): bool {
+  return DB::table('user_blocks')->where(fn($q)=>$q->where('blocker_id',$a)->where('blocked_id',$b))->orWhere(fn($q)=>$q->where('blocker_id',$b)->where('blocked_id',$a))->exists();
  }
 }

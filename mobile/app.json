@@ -9,11 +9,25 @@
     "icon": "./assets/icon.png",
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "sa.pm.used"
+      "bundleIdentifier": "sa.pm.used",
+      "infoPlist": {
+        "NSCameraUsageDescription": "يستخدم مستعمل مجاني الكاميرا عند اختيارك تصوير صور أو فيديو لإعلانك.",
+        "NSPhotoLibraryUsageDescription": "يستخدم مستعمل مجاني مكتبة الصور عند اختيارك صورًا أو فيديو لإعلانك.",
+        "NSMicrophoneUsageDescription": "يستخدم مستعمل مجاني الميكروفون عند اختيارك تسجيل فيديو للإعلان.",
+        "NSLocationWhenInUseUsageDescription": "يستخدم مستعمل مجاني موقعك فقط عند اختيارك إضافة موقع الإعلان أو ترتيب الإعلانات القريبة."
+      }
     },
     "android": {
       "package": "sa.pm.used",
-      "icon": "./assets/icon.png"
+      "icon": "./assets/icon.png",
+      "permissions": [
+        "CAMERA",
+        "RECORD_AUDIO",
+        "ACCESS_FINE_LOCATION",
+        "ACCESS_COARSE_LOCATION",
+        "READ_MEDIA_IMAGES",
+        "READ_MEDIA_VIDEO"
+      ]
     }
   }
 }
