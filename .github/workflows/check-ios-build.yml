@@ -1,0 +1,23 @@
+name: Check Used iOS Build
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - ".github/workflows/check-ios-build.yml"
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    environment: production
+    env:
+      EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - name: Check EAS iOS build status
+        working-directory: mobile
+        run: |
+          npx --yes eas-cli@latest build:view 8510acf5-801f-4430-a2ec-d9aa85788e1f --json
