@@ -1,8 +1,14 @@
 name: Build Used APK Locally
 
-# build trigger: requested 2026-08-15 03:09 +03
+# build trigger: automatic in-app updater 2026-08-15
 on:
   workflow_dispatch:
+    inputs:
+      force_update:
+        description: 'إجبار المستخدمين على تثبيت هذه النسخة قبل المتابعة'
+        required: false
+        default: false
+        type: boolean
   push:
     branches: [main]
     paths:
@@ -40,6 +46,51 @@ jobs:
           rm -f package-lock.json
           npm install
 
+      - name: Stamp APK version and update metadata
+        working-directory: mobile
+        env:
+          VERSION_CODE: ${{ github.run_number }}
+          FORCE_UPDATE: ${{ github.event.inputs.force_update || 'false' }}
+        run: |
+          node <<'NODE'
+          const fs = require('fs');
+
+          const versionCode = Number(process.env.VERSION_CODE);
+          if (!Number.isInteger(versionCode) || versionCode <= 0) {
+            throw new Error(`Invalid VERSION_CODE: ${process.env.VERSION_CODE}`);
+          }
+
+          const versionName = `1.0.${versionCode}`;
+          const config = JSON.parse(fs.readFileSync('app.json', 'utf8'));
+          config.expo.version = versionName;
+          config.expo.android = {
+            ...(config.expo.android || {}),
+            versionCode,
+          };
+          fs.writeFileSync('app.json', `${JSON.stringify(config, null, 2)}\n`);
+
+          const force = String(process.env.FORCE_UPDATE || '').toLowerCase() === 'true';
+          const tag = 'used-latest-apk';
+          const apkUrl = `https://github.com/${process.env.GITHUB_REPOSITORY}/releases/download/${tag}/used-free.apk`;
+          const updateInfo = {
+            versionCode,
+            versionName,
+            apkUrl,
+            force,
+            minimumVersionCode: force ? versionCode : 0,
+            message: force
+              ? 'يتوفر تحديث مهم لمستعمل مجاني. يلزم تثبيت النسخة الجديدة للمتابعة.'
+              : 'يتوفر إصدار جديد من مستعمل مجاني. ننصح بالتحديث للحصول على آخر التحسينات والإصلاحات.',
+            buildSha: process.env.GITHUB_SHA,
+          };
+          fs.writeFileSync('/tmp/version.json', `${JSON.stringify(updateInfo, null, 2)}\n`);
+
+          console.log(`APK_VERSION=${versionName}`);
+          console.log(`APK_VERSION_CODE=${versionCode}`);
+          console.log(`FORCE_UPDATE=${force}`);
+          NODE
+          cat /tmp/version.json
+
       - name: Generate native Android project
         working-directory: mobile
         env:
@@ -74,19 +125,25 @@ jobs:
           if-no-files-found: error
           retention-days: 30
 
-      - name: Publish stable APK download
+      - name: Publish stable APK download and update metadata
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
           TAG="used-latest-apk"
           if gh release view "$TAG" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
-            gh release upload "$TAG" /tmp/used-free.apk --repo "$GITHUB_REPOSITORY" --clobber
-          else
-            gh release create "$TAG" /tmp/used-free.apk \
+            gh release upload "$TAG" /tmp/used-free.apk /tmp/version.json --repo "$GITHUB_REPOSITORY" --clobber
+            gh release edit "$TAG" \
               --repo "$GITHUB_REPOSITORY" \
               --target "$GITHUB_SHA" \
               --title "مستعمل مجاني APK" \
-              --notes "APK مبني محليًا عبر GitHub Actions بدون استخدام EAS Build."
+              --notes "آخر APK مع فحص تحديث تلقائي داخل التطبيق. رقم البناء: $GITHUB_RUN_NUMBER."
+          else
+            gh release create "$TAG" /tmp/used-free.apk /tmp/version.json \
+              --repo "$GITHUB_REPOSITORY" \
+              --target "$GITHUB_SHA" \
+              --title "مستعمل مجاني APK" \
+              --notes "APK مبني محليًا عبر GitHub Actions بدون استخدام EAS Build، مع فحص تحديث تلقائي داخل التطبيق."
           fi
           echo "APK_VARIANT=${{ steps.apk.outputs.variant }}"
           echo "APK_URL=https://github.com/$GITHUB_REPOSITORY/releases/download/$TAG/used-free.apk"
+          echo "UPDATE_INFO_URL=https://github.com/$GITHUB_REPOSITORY/releases/download/$TAG/version.json"
