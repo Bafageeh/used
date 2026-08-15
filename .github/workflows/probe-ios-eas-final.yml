@@ -1,0 +1,31 @@
+name: Probe iOS EAS Final
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - ".github/workflows/probe-ios-eas-final.yml"
+
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    env:
+      EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Verify Expo token and EAS project
+        working-directory: mobile
+        run: |
+          set -euo pipefail
+          if [ -z "${EXPO_TOKEN:-}" ]; then
+            echo "EXPO_TOKEN_MISSING"
+            exit 2
+          fi
+          npx --yes eas-cli@latest whoami
+          echo "--- PROJECT INFO ---"
+          set +e
+          npx --yes eas-cli@latest project:info --non-interactive
+          rc=$?
+          set -e
+          echo "PROJECT_INFO_RC=$rc"
+          exit 0
