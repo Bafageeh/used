@@ -21,6 +21,7 @@ import * as SecureStore from 'expo-secure-store';
 import AdminPanel from './AdminPanel';
 import LegalScreen from './LegalScreen';
 import AgeGate from './AgeGate';
+import ListingsMap from './ListingsMap';
 import { BlockedUsersPanel, ChatSafetyActions, ListingSafetyActions, ReportMessageButton } from './Moderation';
 
 type Category = { id: number; name: string; slug?: string };
@@ -68,7 +69,7 @@ type Conversation = {
   unread_count?: number;
 };
 type MessageNotification = ChatMessage & { conversation?: Conversation };
-type Screen = 'home' | 'favorites' | 'add' | 'notifications' | 'messages' | 'mine' | 'account' | 'blocked' | 'privacy' | 'terms' | 'admin';
+type Screen = 'home' | 'map' | 'favorites' | 'add' | 'notifications' | 'messages' | 'mine' | 'account' | 'blocked' | 'privacy' | 'terms' | 'admin';
 type ViewMode = 'list' | 'grid';
 type ItemCondition = 'new_good' | 'new_defect' | 'used_good' | 'used_defect';
 
@@ -1471,7 +1472,7 @@ export default function App() {
           <Ionicons name="funnel" size={18} color={filterOpen ? '#fff' : PURPLE} />
           <Text style={[styles.filterChipText, filterOpen && styles.filterChipTextActive]}>تصفية</Text>
         </Pressable>
-        <Pressable style={styles.filterChip} onPress={() => Alert.alert('الخريطة', 'واجهة الخريطة جاهزة كخيار، وسيتم تفعيل الخريطة التفاعلية في النسخة المبنية خارج Expo Go.') }>
+        <Pressable style={styles.filterChip} onPress={() => setScreen('map')}>
           <Ionicons name="map-outline" size={19} color={PURPLE} />
           <Text style={styles.filterChipText}>الخريطة</Text>
         </Pressable>
@@ -1620,6 +1621,7 @@ export default function App() {
   );
 
   let content = homeContent;
+  if (screen === 'map') content = <ListingsMap listings={visibleListings} onBack={() => setScreen('home')} onOpenListing={(id) => { setScreen('home'); void openDetail(id); }} />;
   if (screen === 'favorites') content = (
     <ScrollView contentContainerStyle={styles.standardPage}>
       <Text style={styles.sectionTitle}>المفضلة</Text>
@@ -1659,7 +1661,7 @@ export default function App() {
   if (screen === 'terms') content = <LegalScreen type="terms" />;
   if (screen === 'admin') content = token && user?.role === 'admin' ? <AdminPanel token={token} /> : <LoginPanel onLogin={loggedIn} />;
 
-  const isHome = screen === 'home';
+  const isHome = screen === 'home' || screen === 'map';
   return (
     <View style={styles.root}>
       <StatusBar barStyle="light-content" backgroundColor={PURPLE_DARK} />
