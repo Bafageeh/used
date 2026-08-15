@@ -1,0 +1,20 @@
+name: Verify Legal Production
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - .github/workflows/verify-legal-production.yml
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Verify privacy terms and deletion URLs
+        run: |
+          set -euo pipefail
+          curl -fsSL --retry 3 https://used.pm.sa/privacy | grep -q 'سياسة الخصوصية'
+          curl -fsSL --retry 3 https://used.pm.sa/terms | grep -q 'الشروط والأحكام'
+          curl -fsSL --retry 3 https://used.pm.sa/delete-account | grep -q 'حذف حساب مستعمل مجاني'
+          echo 'All public legal URLs are live.'
