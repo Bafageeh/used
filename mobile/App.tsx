@@ -20,7 +20,7 @@ import * as Location from 'expo-location';
 import * as SecureStore from 'expo-secure-store';
 import AdminPanel from './AdminPanel';
 import LegalScreen from './LegalScreen';
-import AgeGate, { AGE_GATE_KEY } from './AgeGate';
+import AgeGate from './AgeGate';
 import { BlockedUsersPanel, ChatSafetyActions, ListingSafetyActions, ReportMessageButton } from './Moderation';
 
 type Category = { id: number; name: string; slug?: string };
@@ -401,6 +401,7 @@ function LoginPanel({ onLogin }: { onLogin: (token: string, user: User) => void 
   const [password, setPassword] = useState('');
   const [busy, setBusy] = useState(false);
   const [termsAccepted, setTermsAccepted] = useState(false);
+  const [ageVerified, setAgeVerified] = useState(false);
 
   const normalizedPhone = () => {
     const digits = phone.replace(/\D/g, '');
@@ -437,6 +438,7 @@ function LoginPanel({ onLogin }: { onLogin: (token: string, user: User) => void 
   const sendRegistrationOtp = async () => {
     setBusy(true);
     try {
+      if (!ageVerified) throw new Error('يجب التحقق من العمر قبل إنشاء الحساب.');
       if (!termsAccepted) throw new Error('يجب الموافقة على الشروط والأحكام وسياسة الخصوصية أولاً.');
       const normalized = normalizedPhone();
       if (!name.trim()) throw new Error('أدخل اسمك.');
@@ -458,6 +460,7 @@ function LoginPanel({ onLogin }: { onLogin: (token: string, user: User) => void 
   const verifyRegistrationOtp = async () => {
     setBusy(true);
     try {
+      if (!ageVerified) throw new Error('يجب التحقق من العمر قبل إنشاء الحساب.');
       if (!termsAccepted) throw new Error('يجب الموافقة على الشروط والأحكام وسياسة الخصوصية أولاً.');
       const normalized = normalizedPhone();
       if (!name.trim()) throw new Error('أدخل اسمك.');
@@ -487,6 +490,7 @@ function LoginPanel({ onLogin }: { onLogin: (token: string, user: User) => void 
     setMode(next);
     setOtpSent(false);
     setOtp('');
+    setAgeVerified(false);
   };
 
   const title = mode === 'admin' ? 'دخول الإدارة' : mode === 'register' ? 'إنشاء حساب جديد' : 'تسجيل الدخول';
@@ -495,6 +499,10 @@ function LoginPanel({ onLogin }: { onLogin: (token: string, user: User) => void 
     : mode === 'register'
       ? 'سجّل برقم جوالك، وسنؤكد الرقم برمز OTP يُرسل إلى واتساب.'
       : 'سجّل الدخول لإضافة إعلان ومتابعة إعلاناتك.';
+
+  if (mode === 'register' && !ageVerified) {
+    return <AgeGate onAllowed={() => setAgeVerified(true)} onBack={() => changeMode('user')} />;
+  }
 
   return (
     <ScrollView contentContainerStyle={styles.formPage} keyboardShouldPersistTaps="handled">
@@ -1132,7 +1140,6 @@ export default function App() {
   const [token, setToken] = useState('');
   const [user, setUser] = useState<User | null>(null);
   const [authRestoring, setAuthRestoring] = useState(true);
-  const [ageAllowed, setAgeAllowed] = useState<boolean | null>(null);
   const [mine, setMine] = useState<Listing[]>([]);
   const [mineLoading, setMineLoading] = useState(false);
   const [detail, setDetail] = useState<Listing | null>(null);
@@ -1184,10 +1191,6 @@ export default function App() {
   }, [listingsPath, token]);
 
   useEffect(() => { loadHome(); }, [loadHome, refreshKey]);
-
-  useEffect(() => {
-    SecureStore.getItemAsync(AGE_GATE_KEY).then((value) => setAgeAllowed(value === 'yes')).catch(() => setAgeAllowed(false));
-  }, []);
 
   useEffect(() => {
     let active = true;
@@ -1492,9 +1495,6 @@ export default function App() {
       ) : null}
     </>
   );
-
-  if (ageAllowed === null) return <View style={styles.center}><ActivityIndicator size="large" color={PURPLE} /><Text style={styles.stateText}>جاري التحقق...</Text></View>;
-  if (!ageAllowed) return <AgeGate onAllowed={() => setAgeAllowed(true)} />;
 
   if (detailLoading) return <View style={styles.center}><ActivityIndicator size="large" color={PURPLE} /><Text style={styles.stateText}>جاري فتح الإعلان...</Text></View>;
 
