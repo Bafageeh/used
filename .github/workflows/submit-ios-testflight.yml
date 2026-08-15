@@ -1,0 +1,24 @@
+name: Submit Used iOS to TestFlight
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - ".github/workflows/submit-ios-testflight.yml"
+
+jobs:
+  submit:
+    runs-on: ubuntu-latest
+    environment: production
+    env:
+      EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - name: Submit iOS build to App Store Connect
+        working-directory: mobile
+        run: |
+          set -euo pipefail
+          npx --yes eas-cli@latest submit --platform ios --id 8510acf5-801f-4430-a2ec-d9aa85788e1f --profile production --non-interactive --no-wait
