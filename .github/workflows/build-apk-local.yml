@@ -1,6 +1,6 @@
 name: Build Used APK Locally
 
-# build trigger: store safety compliance 2026-08-15 10:17 +03
+# build trigger: age gate + interactive map fixes 2026-08-15 10:40 +03
 on:
   workflow_dispatch:
     inputs:
