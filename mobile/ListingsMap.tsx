@@ -129,7 +129,7 @@ const styles = StyleSheet.create({
   title: { color: '#fff', fontSize: 20, fontWeight: '900' },
   subtitle: { color: '#E8DAFF', fontSize: 11, fontWeight: '700', marginTop: 2 },
   webview: { flex: 1, backgroundColor: '#F8F7FA' },
-  loading: { ...StyleSheet.absoluteFillObject, alignItems: 'center', justifyContent: 'center', gap: 9, backgroundColor: '#F8F7FA' },
+  loading: { ...StyleSheet.absoluteFill, alignItems: 'center', justifyContent: 'center', gap: 9, backgroundColor: '#F8F7FA' },
   loadingText: { color: MUTED, fontSize: 13 },
   empty: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: 28 },
   emptyIcon: { width: 92, height: 92, borderRadius: 46, backgroundColor: '#F2EBFF', alignItems: 'center', justifyContent: 'center', marginBottom: 18 },
