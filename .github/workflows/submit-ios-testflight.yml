@@ -22,3 +22,5 @@ jobs:
         run: |
           set -euo pipefail
           npx --yes eas-cli@latest submit --platform ios --id 8510acf5-801f-4430-a2ec-d9aa85788e1f --profile production --non-interactive --no-wait
+
+# rerun after configuring ascAppId
