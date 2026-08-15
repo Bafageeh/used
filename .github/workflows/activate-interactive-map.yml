@@ -65,3 +65,5 @@ jobs:
           git add mobile/App.tsx
           git commit -m "feat: enable interactive map for listings"
           git push origin main
+
+# validation rerun after React Native 0.86 style fix
