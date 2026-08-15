@@ -1,6 +1,6 @@
 name: Build Used APK Locally
 
-# build trigger: automatic in-app updater 2026-08-15
+# build trigger: latest home UI 2026-08-15 04:10 +03
 on:
   workflow_dispatch:
     inputs:
