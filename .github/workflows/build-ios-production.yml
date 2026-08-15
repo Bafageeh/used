@@ -1,5 +1,6 @@
 name: Build Used iOS Production
 
+# rerun after iOS credentials setup 2026-08-15 20:20 +03
 on:
   push:
     branches: [main]
