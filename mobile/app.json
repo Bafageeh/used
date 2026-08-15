@@ -8,8 +8,13 @@
     "userInterfaceStyle": "light",
     "icon": "./assets/icon.png",
     "ios": {
-      "supportsTablet": true,
+      "supportsTablet": false,
       "bundleIdentifier": "sa.pm.used",
+      "buildNumber": "1",
+      "icon": "./assets/icon.png",
+      "config": {
+        "usesNonExemptEncryption": false
+      },
       "infoPlist": {
         "NSCameraUsageDescription": "يستخدم مستعمل مجاني الكاميرا عند اختيارك تصوير صور أو فيديو لإعلانك.",
         "NSPhotoLibraryUsageDescription": "يستخدم مستعمل مجاني مكتبة الصور عند اختيارك صورًا أو فيديو لإعلانك.",
