@@ -1,6 +1,6 @@
 name: Prepare iOS App Icon
 
-# rerun after fixing dynamic Expo config
+# final rerun with static Expo config only
 on:
   push:
     branches: [main]
