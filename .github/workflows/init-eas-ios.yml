@@ -1,0 +1,41 @@
+name: Initialize EAS for Used iOS
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - ".github/workflows/init-eas-ios.yml"
+
+permissions:
+  contents: write
+
+jobs:
+  init:
+    runs-on: ubuntu-latest
+    environment: production
+    env:
+      EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - name: Initialize EAS project
+        working-directory: mobile
+        run: |
+          set -euo pipefail
+          npx --yes eas-cli@latest whoami
+          npx --yes eas-cli@latest init --account bafageeh --non-interactive
+          npx --yes eas-cli@latest project:info --non-interactive
+      - name: Commit EAS project link
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add mobile/app.json mobile/eas.json || true
+          if git diff --cached --quiet; then
+            echo "No EAS link changes to commit"
+          else
+            git commit -m "chore: link Used app to EAS project"
+            git push origin main
+          fi
