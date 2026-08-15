@@ -1,6 +1,6 @@
 name: Build Used APK Locally
 
-# build trigger: repaired final icon 2026-08-15
+# build trigger: requested 2026-08-15 03:09 +03
 on:
   workflow_dispatch:
   push:
