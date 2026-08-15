@@ -22,7 +22,7 @@ export default function AgeGate({ onAllowed, onBack }:{ onAllowed:()=>void; onBa
     <View style={s.card}>
       <View style={s.icon}><Ionicons name="shield-checkmark-outline" size={38} color={P}/></View>
       <Text style={s.title}>التحقق من العمر</Text>
-      <Text style={s.text}>لحماية المستخدمين والالتزام بسياسات المحتوى، أدخل تاريخ ميلادك. لا يتم حفظ تاريخ الميلاد؛ نحفظ على الجهاز فقط تأكيد أن عمرك 18 سنة أو أكثر.</Text>
+      <Text style={s.text}>هذه الخطوة تظهر فقط عند إنشاء حساب جديد. أدخل تاريخ ميلادك للتحقق من أن عمرك 18 سنة أو أكثر، ولا يتم حفظ تاريخ الميلاد.</Text>
       <View style={s.dateRow}>
         <TextInput value={day} onChangeText={setDay} placeholder="يوم" keyboardType="number-pad" maxLength={2} style={s.smallInput} textAlign="center" />
         <TextInput value={month} onChangeText={setMonth} placeholder="شهر" keyboardType="number-pad" maxLength={2} style={s.smallInput} textAlign="center" />
