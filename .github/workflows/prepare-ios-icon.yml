@@ -1,0 +1,54 @@
+name: Prepare iOS App Icon
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - ".github/workflows/prepare-ios-icon.yml"
+
+permissions:
+  contents: write
+
+jobs:
+  icon:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Rebuild and validate App Store icon
+        run: |
+          set -euo pipefail
+          cat mobile/assets/app-icon.b64.part* | base64 -d > /tmp/icon-source.png
+          python3 -m pip install --quiet pillow
+          python3 <<'PY'
+          from PIL import Image
+          src = Image.open('/tmp/icon-source.png').convert('RGBA')
+          bg = Image.new('RGBA', src.size, (255,255,255,255))
+          bg.alpha_composite(src)
+          out = bg.convert('RGB').resize((1024,1024), Image.Resampling.LANCZOS)
+          out.save('mobile/assets/icon.png', format='PNG', optimize=True)
+          check = Image.open('mobile/assets/icon.png')
+          assert check.size == (1024,1024), check.size
+          assert check.mode == 'RGB', check.mode
+          print('ICON_OK', check.size, check.mode)
+          PY
+          file mobile/assets/icon.png
+          ls -lh mobile/assets/icon.png
+
+      - name: Validate Expo config
+        working-directory: mobile
+        run: |
+          rm -f package-lock.json
+          npm install --no-audit --no-fund
+          npx expo-doctor
+          npx expo config --type public >/tmp/expo-config.txt
+          grep -q 'sa.pm.used' /tmp/expo-config.txt
+
+      - name: Commit icon
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add mobile/assets/icon.png
+          git commit -m "fix: add valid 1024px App Store icon"
+          git push origin main
