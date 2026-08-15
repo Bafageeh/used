@@ -1,6 +1,6 @@
 name: Probe iOS EAS Final
 
-# use production environment secret
+# rerun after EXPO_TOKEN added correctly to production environment secret
 on:
   push:
     branches: [main]
