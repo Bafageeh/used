@@ -46,7 +46,7 @@ export default function AuthScreen() {
 
   return <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
     <ScrollView contentContainerStyle={styles.root} keyboardShouldPersistTaps="handled">
-      <Text style={styles.brand}>مستعمل مجاني</Text>
+      <Text style={styles.brand}>تنازل</Text>
       <Text style={styles.subtitle}>{step === 'otp' ? 'أدخل الرمز المرسل عبر واتساب' : 'دخول آمن وسريع إلى حسابك'}</Text>
       {step === 'form' && <>
         <View style={styles.switch}>

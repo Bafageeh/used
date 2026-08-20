@@ -23,7 +23,7 @@ export default function MyListingsScreen() {
   return <FlatList style={styles.root} data={items} keyExtractor={item => String(item.id)} renderItem={({ item }) => <ListingCard item={item} />}
     contentContainerStyle={styles.list} refreshControl={<RefreshControl refreshing={loading} onRefresh={load} />}
     ListHeaderComponent={<Pressable style={styles.button} onPress={() => router.push('/create-listing')}><Text style={styles.buttonText}>+ إضافة إعلان جديد</Text></Pressable>}
-    ListEmptyComponent={!loading ? <EmptyState title="لا توجد إعلانات" message="أضف إعلانك الأول مجانًا." /> : null} />;
+    ListEmptyComponent={!loading ? <EmptyState title="لا توجد إعلانات" message="أضف إعلانك الأول." /> : null} />;
 }
 
 const styles = StyleSheet.create({

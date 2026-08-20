@@ -50,7 +50,7 @@ async function checkForAppUpdate() {
     const mandatory = Boolean(update.force) || (Number.isFinite(minimumBuild) && minimumBuild > 0 && currentBuild < minimumBuild);
     const latestLabel = update.versionName ? ` (${update.versionName})` : '';
     const message = update.message?.trim()
-      || `يتوفر إصدار جديد من مستعمل مجاني${latestLabel}. اضغط «تحديث الآن» لتنزيل النسخة الجديدة وتثبيتها.`;
+      || `يتوفر إصدار جديد من تنازل${latestLabel}. اضغط «تحديث الآن» لتنزيل النسخة الجديدة وتثبيتها.`;
 
     const buttons = mandatory
       ? [

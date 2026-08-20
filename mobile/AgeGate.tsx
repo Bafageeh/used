@@ -15,7 +15,7 @@ export default function AgeGate({ onAllowed, onBack }:{ onAllowed:()=>void; onBa
     let age=now.getFullYear()-y;
     const birthdayPassed=(now.getMonth()>m-1)||(now.getMonth()===m-1&&now.getDate()>=d);
     if(!birthdayPassed) age--;
-    if(age<18) return Alert.alert('العمر المطلوب','«مستعمل مجاني» مخصص للمستخدمين بعمر 18 سنة فأكثر.');
+    if(age<18) return Alert.alert('العمر المطلوب','«تنازل» مخصص للمستخدمين بعمر 18 سنة فأكثر.');
     onAllowed();
   };
   return <KeyboardAvoidingView behavior={Platform.OS==='ios'?'padding':undefined} style={s.root}>
