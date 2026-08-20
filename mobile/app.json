@@ -1,6 +1,6 @@
 {
   "expo": {
-    "name": "مستعمل مجاني",
+    "name": "تنازل",
     "slug": "used",
     "version": "1.0.0",
     "orientation": "portrait",
@@ -16,10 +16,11 @@
         "usesNonExemptEncryption": false
       },
       "infoPlist": {
-        "NSCameraUsageDescription": "يستخدم مستعمل مجاني الكاميرا عند اختيارك تصوير صور أو فيديو لإعلانك.",
-        "NSPhotoLibraryUsageDescription": "يستخدم مستعمل مجاني مكتبة الصور عند اختيارك صورًا أو فيديو لإعلانك.",
-        "NSMicrophoneUsageDescription": "يستخدم مستعمل مجاني الميكروفون عند اختيارك تسجيل فيديو للإعلان.",
-        "NSLocationWhenInUseUsageDescription": "يستخدم مستعمل مجاني موقعك فقط عند اختيارك إضافة موقع الإعلان أو ترتيب الإعلانات القريبة."
+        "CFBundleDisplayName": "تنازل",
+        "NSCameraUsageDescription": "يستخدم تنازل الكاميرا عند اختيارك تصوير صور أو فيديو لإعلانك.",
+        "NSPhotoLibraryUsageDescription": "يستخدم تنازل مكتبة الصور عند اختيارك صورًا أو فيديو لإعلانك.",
+        "NSMicrophoneUsageDescription": "يستخدم تنازل الميكروفون عند اختيارك تسجيل فيديو للإعلان.",
+        "NSLocationWhenInUseUsageDescription": "يستخدم تنازل موقعك فقط عند اختيارك إضافة موقع الإعلان أو ترتيب الإعلانات القريبة."
       }
     },
     "android": {

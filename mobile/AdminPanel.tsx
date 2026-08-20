@@ -60,7 +60,7 @@ export default function AdminPanel({ token }: { token:string }) {
 
   const tabs:[Tab,string,any][]=[['dashboard','الرئيسية','speedometer-outline'],['users','الحسابات','people-outline'],['listings','الإعلانات','albums-outline'],['reports','البلاغات','flag-outline'],['categories','التصنيفات','grid-outline'],['settings','الإعدادات','settings-outline']];
   return <View style={s.root}>
-    <View style={s.hero}><View><Text style={s.heroTitle}>لوحة الإدارة</Text><Text style={s.heroSub}>تحكم كامل بمستعمل مجاني</Text></View><View style={s.shield}><Ionicons name="shield-checkmark" size={28} color="#fff"/></View></View>
+    <View style={s.hero}><View><Text style={s.heroTitle}>لوحة الإدارة</Text><Text style={s.heroSub}>تحكم كامل بتنازل</Text></View><View style={s.shield}><Ionicons name="shield-checkmark" size={28} color="#fff"/></View></View>
     <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={s.tabs}>{tabs.map(([k,l,i])=><Pressable key={k} onPress={()=>{setQ('');setTab(k)}} style={[s.tab,tab===k&&s.tabOn]}><Ionicons name={i} size={18} color={tab===k?'#fff':P}/><Text style={[s.tabText,tab===k&&s.tabTextOn]}>{l}</Text></Pressable>)}</ScrollView>
     <ScrollView contentContainerStyle={s.page} keyboardShouldPersistTaps="handled">
       {busy?<ActivityIndicator color={P} style={{margin:20}}/>:null}

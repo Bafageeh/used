@@ -750,7 +750,7 @@ function CreateListing({ categories, token, onPublished }: { categories: Categor
       </View>
 
       <Pressable style={[styles.primaryButton, busy && styles.disabled]} onPress={submit} disabled={busy}>
-        {busy ? <ActivityIndicator color="#fff" /> : <><Ionicons name="add-circle-outline" size={20} color="#fff" /><Text style={styles.primaryButtonText}>نشر الإعلان مجانًا</Text></>}
+        {busy ? <ActivityIndicator color="#fff" /> : <><Ionicons name="add-circle-outline" size={20} color="#fff" /><Text style={styles.primaryButtonText}>نشر الإعلان</Text></>}
       </Pressable>
     </ScrollView>
   );
@@ -1240,7 +1240,7 @@ export default function App() {
       const data = await request<{ count: number }>('/messages/unread-count', {}, token);
       const next = Number(data?.count || 0);
       if (unreadBaseline.current !== null && next > unreadBaseline.current && screen !== 'messages') {
-        Alert.alert('رسالة جديدة', 'وصلتك رسالة جديدة في مستعمل مجاني.');
+        Alert.alert('رسالة جديدة', 'وصلتك رسالة جديدة في تنازل.');
       }
       unreadBaseline.current = next;
       setUnreadMessages(next);
@@ -1437,7 +1437,7 @@ export default function App() {
 
   const header = (
     <View style={styles.marketHeader}>
-      <Text style={styles.marketTitle}>مستعمل مجاني</Text>
+      <Text style={styles.marketTitle}>تنازل</Text>
       <View style={styles.searchHeaderRow}>
         <IconButton name={viewMode === 'list' ? 'grid-outline' : 'list-outline'} onPress={() => setViewMode((x) => x === 'list' ? 'grid' : 'list')} />
         <View style={styles.searchBox}>
@@ -1764,7 +1764,7 @@ export default function App() {
         <View style={styles.menuLayer} pointerEvents="box-none">
           <Pressable style={styles.menuBackdrop} onPress={() => setMenuOpen(false)} />
           <View style={styles.sideMenu}>
-            <View style={styles.sideMenuHeader}><View style={styles.sideLogo}><Ionicons name="bag-handle" size={24} color="#fff" /></View><View style={{ flex: 1 }}><Text style={styles.sideTitle}>مستعمل مجاني</Text><Text style={styles.sideSub}>{user ? `مرحبًا ${user.name}` : 'بيع واشتري بسهولة'}</Text></View><Pressable onPress={() => setMenuOpen(false)}><Ionicons name="close" size={27} color={TEXT} /></Pressable></View>
+            <View style={styles.sideMenuHeader}><View style={styles.sideLogo}><Ionicons name="bag-handle" size={24} color="#fff" /></View><View style={{ flex: 1 }}><Text style={styles.sideTitle}>تنازل</Text><Text style={styles.sideSub}>{user ? `مرحبًا ${user.name}` : 'اعرض وتنازل بسهولة'}</Text></View><Pressable onPress={() => setMenuOpen(false)}><Ionicons name="close" size={27} color={TEXT} /></Pressable></View>
             {([
               ['home', 'home-outline', 'الرئيسية'],
               ['mine', 'albums-outline', 'إعلاناتي'],

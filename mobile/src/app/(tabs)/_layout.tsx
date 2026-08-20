@@ -17,7 +17,7 @@ export default function TabsLayout() {
   return (
     <View style={styles.root}>
       <View style={styles.header}>
-        <Text style={styles.headerTitle}>مستعمل مجاني</Text>
+        <Text style={styles.headerTitle}>تنازل</Text>
       </View>
 
       <View style={styles.content}>

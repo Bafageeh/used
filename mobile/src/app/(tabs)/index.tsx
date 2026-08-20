@@ -31,8 +31,8 @@ export default function HomeScreen() {
 
   return <View style={styles.root}>
     <View style={styles.hero}>
-      <Text style={styles.heroTitle}>بيع واشتري بسهولة</Text>
-      <Text style={styles.heroText}>أعلن مجانًا وتواصل مباشرة مع البائع</Text>
+      <Text style={styles.heroTitle}>اعرض وتنازل بسهولة</Text>
+      <Text style={styles.heroText}>أضف إعلانك وتواصل مباشرة مع المهتمين</Text>
     </View>
     <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.categories}>
       <Pressable style={[styles.category, !categoryId && styles.categoryActive]} onPress={() => setCategoryId(undefined)}>

@@ -104,7 +104,7 @@ export default function CreateListingScreen() {
       <TextInput style={styles.input} placeholder="المدينة" value={city} onChangeText={setCity} textAlign="right" />
       <Pressable style={styles.location} onPress={locate}><Text style={styles.locationText}>{coords ? '✓ تم تحديد الموقع الدقيق' : 'تحديد الموقع الحالي'}</Text></Pressable>
       <View style={styles.switchRow}><Switch value={showPhone} onValueChange={setShowPhone} trackColor={{ true: colors.primary }} /><Text style={styles.switchText}>إظهار رقم جوالي للمشترين</Text></View>
-      <Pressable style={[styles.submit, busy && { opacity: .6 }]} onPress={submit} disabled={busy}><Text style={styles.submitText}>{busy ? 'جاري النشر...' : 'نشر الإعلان مجانًا'}</Text></Pressable>
+      <Pressable style={[styles.submit, busy && { opacity: .6 }]} onPress={submit} disabled={busy}><Text style={styles.submitText}>{busy ? 'جاري النشر...' : 'نشر الإعلان'}</Text></Pressable>
     </ScrollView>
   </KeyboardAvoidingView>;
 }
