@@ -11,12 +11,13 @@ use App\Http\Controllers\Api\ModerationController;
 use App\Http\Controllers\Api\AdminModerationController;
 use Illuminate\Support\Facades\Route;
 
-Route::get('/health', fn () => response()->json(['status'=>'ok','service'=>'مستعمل مجاني']));
+Route::get('/health', fn () => response()->json(['status'=>'ok','service'=>'تنازل']));
 Route::get('/categories',[CategoryController::class,'index']);
 Route::get('/listings',[ListingController::class,'index']);
 Route::get('/listings/{listing}',[ListingController::class,'show']);
 Route::post('/auth/request-otp',[AuthController::class,'requestOtp'])->middleware('throttle:5,1');
 Route::post('/auth/verify-otp',[AuthController::class,'verifyOtp'])->middleware('throttle:10,1');
+Route::post('/auth/register',[AuthController::class,'register'])->middleware('throttle:5,1');
 Route::post('/auth/login',[AuthController::class,'loginWithPin'])->middleware('throttle:10,1');
 Route::post('/auth/admin-login',[AuthController::class,'adminLogin'])->middleware('throttle:10,1');
 

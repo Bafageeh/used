@@ -167,3 +167,30 @@ jobs:
             exit 1
           fi
           echo 'LOGIN_CONTRACT=PIN'
+
+      - name: Verify in-app registration contract
+        run: |
+          set -eu
+          USERNAME="deploycheck$(date +%s)"
+          PIN="648271"
+
+          REGISTER_STATUS=$(curl -sS -o /tmp/register.json -w '%{http_code}' -X POST 'https://used.pm.sa/api/auth/register' \
+            -H 'Accept: application/json' \
+            -H 'Content-Type: application/json' \
+            --data "{\"name\":\"Deploy Check\",\"username\":\"$USERNAME\",\"pin\":\"$PIN\",\"device_name\":\"github-deploy-check\"}")
+          test "$REGISTER_STATUS" = "200"
+          TOKEN=$(jq -r '.token // empty' /tmp/register.json)
+          test -n "$TOKEN"
+
+          LOGIN_STATUS=$(curl -sS -o /tmp/login.json -w '%{http_code}' -X POST 'https://used.pm.sa/api/auth/login' \
+            -H 'Accept: application/json' \
+            -H 'Content-Type: application/json' \
+            --data "{\"username\":\"$USERNAME\",\"pin\":\"$PIN\",\"device_name\":\"github-login-check\"}")
+          test "$LOGIN_STATUS" = "200"
+          test -n "$(jq -r '.token // empty' /tmp/login.json)"
+
+          DELETE_STATUS=$(curl -sS -o /dev/null -w '%{http_code}' -X DELETE 'https://used.pm.sa/api/account' \
+            -H 'Accept: application/json' \
+            -H "Authorization: Bearer $TOKEN")
+          test "$DELETE_STATUS" = "204"
+          echo 'IN_APP_REGISTRATION=READY'

@@ -16,6 +16,34 @@ use Throwable;
 
 class AuthController extends Controller
 {
+    public function register(Request $request)
+    {
+        $data = $request->validate([
+            'name' => ['required', 'string', 'max:100'],
+            'username' => ['required', 'string', 'min:3', 'max:30', 'regex:/^[A-Za-z0-9_]+$/', 'unique:users,username'],
+            'pin' => ['required', 'digits_between:4,8'],
+            'device_name' => ['nullable', 'string', 'max:100'],
+        ]);
+        $username = Str::lower($data['username']);
+        if (in_array($username, ['admin', 'administrator', 'support', 'tanazul', 'used'], true)) {
+            return response()->json(['message' => 'اسم المستخدم محجوز، اختر اسمًا آخر.'], 422);
+        }
+
+        $user = User::create([
+            'name' => trim($data['name']),
+            'username' => $username,
+            'pin' => $data['pin'],
+            'password' => Str::random(64),
+            'role' => 'user',
+            'is_active' => true,
+        ]);
+
+        return [
+            'token' => $user->createToken($data['device_name'] ?? 'mobile')->plainTextToken,
+            'user' => $user,
+        ];
+    }
+
     public function requestOtp(Request $request, WhatsAppOtpService $whatsApp)
     {
         $data = $request->validate([
@@ -94,9 +122,16 @@ class AuthController extends Controller
 
     public function loginWithPin(Request $request)
     {
-        $data = $request->validate(['phone'=>['required','regex:/^9665[0-9]{8}$/'],'pin'=>['required','digits_between:4,8'],'device_name'=>['nullable','string','max:100']]);
-        $user = User::where('phone',$data['phone'])->first();
-        if (!$user || !$user->pin || !Hash::check($data['pin'],$user->pin)) return response()->json(['message'=>'رقم الجوال أو الرقم السري غير صحيح.'],422);
+        $data = $request->validate([
+            'phone' => ['nullable', 'required_without:username', 'regex:/^9665[0-9]{8}$/'],
+            'username' => ['nullable', 'required_without:phone', 'string', 'min:3', 'max:30'],
+            'pin' => ['required', 'digits_between:4,8'],
+            'device_name' => ['nullable', 'string', 'max:100'],
+        ]);
+        $user = isset($data['phone'])
+            ? User::where('phone', $data['phone'])->first()
+            : User::where('username', Str::lower($data['username']))->first();
+        if (!$user || $user->role === 'admin' || !$user->pin || !Hash::check($data['pin'],$user->pin)) return response()->json(['message'=>'بيانات الدخول أو الرقم السري غير صحيحة.'],422);
         abort_unless($user->is_active,403,'الحساب موقوف.');
         return ['token'=>$user->createToken($data['device_name'] ?? 'mobile')->plainTextToken,'user'=>$user];
     }

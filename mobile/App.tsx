@@ -405,10 +405,9 @@ function ListingCard({
 function LoginPanel({ onLogin }: { onLogin: (token: string, user: User) => void }) {
   const [mode, setMode] = useState<'user' | 'register' | 'admin'>('user');
   const [phone, setPhone] = useState('');
+  const [registrationUsername, setRegistrationUsername] = useState('');
   const [pin, setPin] = useState('');
   const [name, setName] = useState('');
-  const [otp, setOtp] = useState('');
-  const [otpSent, setOtpSent] = useState(false);
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [busy, setBusy] = useState(false);
@@ -433,10 +432,13 @@ function LoginPanel({ onLogin }: { onLogin: (token: string, user: User) => void 
           method: 'POST', body: JSON.stringify({ username: username.trim(), password, device_name: 'Used Admin Android' }),
         });
       } else {
-        const normalized = normalizedPhone();
+        const identifier = phone.trim();
+        const credentials = /^\d/.test(identifier)
+          ? { phone: normalizedPhone() }
+          : { username: identifier.toLowerCase() };
         if (!/^\d{4,8}$/.test(pin)) throw new Error('أدخل الرقم السري من 4 إلى 8 أرقام.');
         result = await request<{ token: string; user: User }>('/auth/login', {
-          method: 'POST', body: JSON.stringify({ phone: normalized, pin, device_name: 'Used Android' }),
+          method: 'POST', body: JSON.stringify({ ...credentials, pin, device_name: 'Tanazul Mobile' }),
         });
       }
       onLogin(result.token, result.user);
@@ -447,52 +449,23 @@ function LoginPanel({ onLogin }: { onLogin: (token: string, user: User) => void 
     }
   };
 
-  const sendRegistrationOtp = async () => {
+  const registerAccount = async () => {
     setBusy(true);
     try {
       if (!ageVerified) throw new Error('يجب التحقق من العمر قبل إنشاء الحساب.');
       if (!termsAccepted) throw new Error('يجب الموافقة على الشروط والأحكام وسياسة الخصوصية أولاً.');
-      const normalized = normalizedPhone();
       if (!name.trim()) throw new Error('أدخل اسمك.');
+      const normalizedUsername = registrationUsername.trim().toLowerCase();
+      if (!/^[a-z0-9_]{3,30}$/.test(normalizedUsername)) throw new Error('اسم المستخدم يجب أن يكون من 3 إلى 30 حرفًا إنجليزيًا أو رقمًا، ويمكن استخدام _.');
       if (!/^\d{4,8}$/.test(pin)) throw new Error('اختر رقمًا سريًا من 4 إلى 8 أرقام.');
-      await request<{ message: string; expires_in: number }>('/auth/request-otp', {
+      const result = await request<{ token: string; user: User }>('/auth/register', {
         method: 'POST',
-        body: JSON.stringify({ phone: normalized, purpose: 'register' }),
-      });
-      setOtpSent(true);
-      setOtp('');
-      Alert.alert('تم إرسال الرمز', 'أرسلنا رمز تحقق مكوّنًا من 6 أرقام إلى واتساب. الرمز صالح لمدة 5 دقائق.');
-    } catch (e) {
-      Alert.alert('تعذر إرسال الرمز', e instanceof Error ? e.message : 'حدث خطأ غير متوقع.');
-    } finally {
-      setBusy(false);
-    }
-  };
-
-  const verifyRegistrationOtp = async () => {
-    setBusy(true);
-    try {
-      if (!ageVerified) throw new Error('يجب التحقق من العمر قبل إنشاء الحساب.');
-      if (!termsAccepted) throw new Error('يجب الموافقة على الشروط والأحكام وسياسة الخصوصية أولاً.');
-      const normalized = normalizedPhone();
-      if (!name.trim()) throw new Error('أدخل اسمك.');
-      if (!/^\d{4,8}$/.test(pin)) throw new Error('اختر رقمًا سريًا من 4 إلى 8 أرقام.');
-      if (!/^\d{6}$/.test(otp)) throw new Error('أدخل رمز التحقق المكوّن من 6 أرقام.');
-      const result = await request<{ token: string; user: User }>('/auth/verify-otp', {
-        method: 'POST',
-        body: JSON.stringify({
-          phone: normalized,
-          purpose: 'register',
-          code: otp,
-          name: name.trim(),
-          pin,
-          device_name: 'Used Android',
-        }),
+        body: JSON.stringify({ name: name.trim(), username: normalizedUsername, pin, device_name: 'Tanazul Mobile' }),
       });
       onLogin(result.token, result.user);
-      Alert.alert('تم التسجيل', 'تم التحقق من رقم واتساب وإنشاء حسابك بنجاح.');
+      Alert.alert('تم إنشاء الحساب', 'أصبح حسابك جاهزًا ويمكنك استخدام جميع ميزات تنازل.');
     } catch (e) {
-      Alert.alert('تعذر التحقق', e instanceof Error ? e.message : 'حدث خطأ غير متوقع.');
+      Alert.alert('تعذر إنشاء الحساب', e instanceof Error ? e.message : 'حدث خطأ غير متوقع.');
     } finally {
       setBusy(false);
     }
@@ -500,8 +473,6 @@ function LoginPanel({ onLogin }: { onLogin: (token: string, user: User) => void 
 
   const changeMode = (next: 'user' | 'register' | 'admin') => {
     setMode(next);
-    setOtpSent(false);
-    setOtp('');
     setAgeVerified(false);
   };
 
@@ -509,7 +480,7 @@ function LoginPanel({ onLogin }: { onLogin: (token: string, user: User) => void 
   const help = mode === 'admin'
     ? 'دخول المدير للتحكم الكامل بالحسابات والإعلانات والإعدادات.'
     : mode === 'register'
-      ? 'سجّل برقم جوالك، وسنؤكد الرقم برمز OTP يُرسل إلى واتساب.'
+      ? 'أنشئ حسابك من داخل التطبيق باسم مستخدم ورقم سري.'
       : 'سجّل الدخول لإضافة إعلان ومتابعة إعلاناتك.';
 
   if (mode === 'register' && !ageVerified) {
@@ -541,10 +512,10 @@ function LoginPanel({ onLogin }: { onLogin: (token: string, user: User) => void 
         <View style={styles.inputShell}><Ionicons name="key-outline" size={20} color={MUTED} /><TextInput style={styles.inputInner} value={password} onChangeText={setPassword} placeholder="كلمة المرور" secureTextEntry textAlign="right" /></View>
         <Pressable style={[styles.primaryButton, busy && styles.disabled]} onPress={submitLogin} disabled={busy}>{busy ? <ActivityIndicator color="#fff" /> : <Text style={styles.primaryButtonText}>دخول لوحة الإدارة</Text>}</Pressable>
       </> : mode === 'register' ? <>
-        <View style={styles.inputShell}><Ionicons name="person-outline" size={20} color={MUTED} /><TextInput style={styles.inputInner} value={name} onChangeText={setName} placeholder="الاسم" textAlign="right" editable={!otpSent} /></View>
-        <View style={styles.inputShell}><Ionicons name="logo-whatsapp" size={20} color={MUTED} /><TextInput style={styles.inputInner} value={phone} onChangeText={setPhone} placeholder="05xxxxxxxx" keyboardType="phone-pad" textAlign="right" editable={!otpSent} /></View>
-        <View style={styles.inputShell}><Ionicons name="lock-closed-outline" size={20} color={MUTED} /><TextInput style={styles.inputInner} value={pin} onChangeText={setPin} placeholder="اختر رقمًا سريًا من 4 إلى 8 أرقام" keyboardType="number-pad" secureTextEntry textAlign="right" editable={!otpSent} /></View>
-        <Pressable onPress={() => !otpSent && setTermsAccepted((x) => !x)} disabled={otpSent} style={{ minHeight:48, borderRadius:13, borderWidth:1, borderColor:termsAccepted?PURPLE:'#D8D2DF', backgroundColor:termsAccepted?PURPLE_LIGHT:'#fff', paddingHorizontal:12, flexDirection:'row-reverse', alignItems:'center', gap:9, marginBottom:7 }}>
+        <View style={styles.inputShell}><Ionicons name="person-outline" size={20} color={MUTED} /><TextInput style={styles.inputInner} value={name} onChangeText={setName} placeholder="الاسم" textAlign="right" /></View>
+        <View style={styles.inputShell}><Ionicons name="at-outline" size={20} color={MUTED} /><TextInput style={styles.inputInner} value={registrationUsername} onChangeText={setRegistrationUsername} placeholder="اسم المستخدم بالإنجليزية" autoCapitalize="none" autoCorrect={false} textAlign="right" /></View>
+        <View style={styles.inputShell}><Ionicons name="lock-closed-outline" size={20} color={MUTED} /><TextInput style={styles.inputInner} value={pin} onChangeText={setPin} placeholder="اختر رقمًا سريًا من 4 إلى 8 أرقام" keyboardType="number-pad" secureTextEntry textAlign="right" /></View>
+        <Pressable onPress={() => setTermsAccepted((x) => !x)} style={{ minHeight:48, borderRadius:13, borderWidth:1, borderColor:termsAccepted?PURPLE:'#D8D2DF', backgroundColor:termsAccepted?PURPLE_LIGHT:'#fff', paddingHorizontal:12, flexDirection:'row-reverse', alignItems:'center', gap:9, marginBottom:7 }}>
           <Ionicons name={termsAccepted ? 'checkbox' : 'square-outline'} size={23} color={PURPLE} />
           <Text style={{ flex:1, textAlign:'right', color:TEXT, fontSize:12, fontWeight:'800' }}>أوافق على الشروط والأحكام وسياسة الخصوصية</Text>
         </Pressable>
@@ -552,20 +523,12 @@ function LoginPanel({ onLogin }: { onLogin: (token: string, user: User) => void 
           <Pressable onPress={() => void Linking.openURL(`${SITE_URL}/terms`)}><Text style={{ color:PURPLE, fontSize:11, fontWeight:'900', textDecorationLine:'underline' }}>الشروط والأحكام</Text></Pressable>
           <Pressable onPress={() => void Linking.openURL(`${SITE_URL}/privacy`)}><Text style={{ color:PURPLE, fontSize:11, fontWeight:'900', textDecorationLine:'underline' }}>سياسة الخصوصية</Text></Pressable>
         </View>
-        {otpSent ? <>
-          <View style={styles.inputShell}><Ionicons name="chatbubble-ellipses-outline" size={20} color={MUTED} /><TextInput style={styles.inputInner} value={otp} onChangeText={setOtp} placeholder="رمز OTP المرسل على واتساب" keyboardType="number-pad" maxLength={6} textAlign="right" /></View>
-          <Text style={[styles.help, { marginTop: 0 }]}>أدخل الرمز خلال 5 دقائق. إذا لم يصلك، يمكنك طلب رمز جديد بعد دقيقة.</Text>
-          <Pressable style={[styles.primaryButton, busy && styles.disabled]} onPress={verifyRegistrationOtp} disabled={busy}>{busy ? <ActivityIndicator color="#fff" /> : <Text style={styles.primaryButtonText}>تأكيد الرمز وإنشاء الحساب</Text>}</Pressable>
-          <Pressable onPress={sendRegistrationOtp} disabled={busy} style={{ alignItems:'center', paddingVertical:13 }}><Text style={{ color:PURPLE, fontWeight:'900' }}>إعادة إرسال رمز واتساب</Text></Pressable>
-          <Pressable onPress={() => { setOtpSent(false); setOtp(''); }} disabled={busy} style={{ alignItems:'center', paddingVertical:8 }}><Text style={{ color:MUTED, fontWeight:'800' }}>تعديل البيانات</Text></Pressable>
-        </> : (
-          <Pressable style={[styles.primaryButton, busy && styles.disabled]} onPress={sendRegistrationOtp} disabled={busy}>{busy ? <ActivityIndicator color="#fff" /> : <View style={{ flexDirection:'row', gap:8, alignItems:'center' }}><Ionicons name="logo-whatsapp" size={20} color="#fff" /><Text style={styles.primaryButtonText}>إرسال رمز التحقق عبر واتساب</Text></View>}</Pressable>
-        )}
+        <Pressable style={[styles.primaryButton, busy && styles.disabled]} onPress={registerAccount} disabled={busy}>{busy ? <ActivityIndicator color="#fff" /> : <Text style={styles.primaryButtonText}>إنشاء الحساب</Text>}</Pressable>
       </> : <>
-        <View style={styles.inputShell}><Ionicons name="call-outline" size={20} color={MUTED} /><TextInput style={styles.inputInner} value={phone} onChangeText={setPhone} placeholder="05xxxxxxxx" keyboardType="phone-pad" textAlign="right" /></View>
+        <View style={styles.inputShell}><Ionicons name="person-outline" size={20} color={MUTED} /><TextInput style={styles.inputInner} value={phone} onChangeText={setPhone} placeholder="رقم الجوال أو اسم المستخدم" autoCapitalize="none" autoCorrect={false} textAlign="right" /></View>
         <View style={styles.inputShell}><Ionicons name="lock-closed-outline" size={20} color={MUTED} /><TextInput style={styles.inputInner} value={pin} onChangeText={setPin} placeholder="الرقم السري" keyboardType="number-pad" secureTextEntry textAlign="right" /></View>
         <Pressable style={[styles.primaryButton, busy && styles.disabled]} onPress={submitLogin} disabled={busy}>{busy ? <ActivityIndicator color="#fff" /> : <Text style={styles.primaryButtonText}>دخول</Text>}</Pressable>
-        <Pressable onPress={() => changeMode('register')} style={{ alignItems:'center', paddingVertical:16 }}><Text style={{ color:PURPLE, fontWeight:'900' }}>ليس لديك حساب؟ تسجيل جديد عبر واتساب</Text></Pressable>
+        <Pressable onPress={() => changeMode('register')} style={{ alignItems:'center', paddingVertical:16 }}><Text style={{ color:PURPLE, fontWeight:'900' }}>ليس لديك حساب؟ أنشئ حسابًا من داخل التطبيق</Text></Pressable>
       </>}
     </ScrollView>
   );
@@ -1668,7 +1631,7 @@ export default function App() {
       <View style={styles.accountCard}>
         <View style={styles.accountAvatar}><Ionicons name="person" size={34} color={PURPLE} /></View>
         <Text style={styles.accountName}>{user.name}</Text>
-        <Text style={styles.accountPhone}>{user.phone}</Text>
+        <Text style={styles.accountPhone}>{user.phone || (user.username ? `@${user.username}` : '')}</Text>
       </View>
       <Pressable style={styles.menuAction} onPress={() => setScreen('mine')}><Ionicons name="albums-outline" size={22} color={PURPLE} /><Text style={styles.menuActionText}>إعلاناتي</Text><Ionicons name="chevron-back" size={20} color="#A1A1AA" /></Pressable>
       <Pressable style={styles.menuAction} onPress={() => setScreen('blocked')}><Ionicons name="ban-outline" size={22} color={PURPLE} /><Text style={styles.menuActionText}>المستخدمون المحظورون</Text><Ionicons name="chevron-back" size={20} color="#A1A1AA" /></Pressable>
