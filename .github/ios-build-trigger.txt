@@ -1,1 +1,1 @@
-Build 5 TestFlight status check — 2026-08-23 23:41 +03
+Build 5 EAS status check — retry from mobile directory
