@@ -43,11 +43,7 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 24
-      - name: Check EAS build and submission status
+      - name: Check EAS build status
+        working-directory: mobile
         run: |
-          set +e
-          echo '=== BUILD STATUS ==='
           npx --yes eas-cli@latest build:view bd3c67d7-dac9-4078-8e27-125b69c59730 --json
-          echo '=== SUBMISSION STATUS ==='
-          npx --yes eas-cli@latest submit:list --platform ios --limit 5 --json
-          exit 0
