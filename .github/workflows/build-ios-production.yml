@@ -2,6 +2,10 @@ name: Build Tanazul iOS Production
 
 on:
   workflow_dispatch:
+  pull_request:
+    branches: [main]
+    paths:
+      - ".github/ios-build-trigger.txt"
 
 jobs:
   build:
@@ -19,10 +23,10 @@ jobs:
         run: |
           rm -f package-lock.json
           npm install --no-audit --no-fund
-      - name: Trigger iOS production build
+      - name: Build and submit iOS production to TestFlight
         working-directory: mobile
         run: |
           set -euo pipefail
           npx --yes eas-cli@latest whoami
           npx --yes eas-cli@latest project:info --non-interactive
-          npx --yes eas-cli@latest build --platform ios --profile production --non-interactive --no-wait
+          npx --yes eas-cli@latest build --platform ios --profile production --auto-submit --non-interactive --no-wait
