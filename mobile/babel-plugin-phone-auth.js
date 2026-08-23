@@ -6,15 +6,36 @@ module.exports = function phoneAuthPlugin({ types: t }) {
     visitor: {
       Program(path, state) {
         if (!isTarget(state)) return;
-        const alreadyImported = path.node.body.some(
+
+        const hasPanelImport = path.node.body.some(
           (node) => t.isImportDeclaration(node) && node.source.value === './PhoneLoginPanel',
         );
-        if (!alreadyImported) {
+        if (!hasPanelImport) {
           path.unshiftContainer(
             'body',
             t.importDeclaration(
               [t.importDefaultSpecifier(t.identifier('PhoneLoginPanel'))],
               t.stringLiteral('./PhoneLoginPanel'),
+            ),
+          );
+        }
+
+        const hasCreateElementImport = path.node.body.some(
+          (node) => t.isImportDeclaration(node)
+            && node.source.value === 'react'
+            && node.specifiers.some((specifier) => t.isImportSpecifier(specifier) && specifier.imported?.name === 'createElement'),
+        );
+        if (!hasCreateElementImport) {
+          path.unshiftContainer(
+            'body',
+            t.importDeclaration(
+              [
+                t.importSpecifier(
+                  t.identifier('__tanazulCreateElement'),
+                  t.identifier('createElement'),
+                ),
+              ],
+              t.stringLiteral('react'),
             ),
           );
         }
@@ -30,17 +51,15 @@ module.exports = function phoneAuthPlugin({ types: t }) {
           true,
         );
         const props = t.objectPattern([onLoginProperty]);
-        const opening = t.jsxOpeningElement(
-          t.jsxIdentifier('PhoneLoginPanel'),
+        const component = t.callExpression(
+          t.identifier('__tanazulCreateElement'),
           [
-            t.jsxAttribute(
-              t.jsxIdentifier('onLogin'),
-              t.jsxExpressionContainer(t.identifier('onLogin')),
-            ),
+            t.identifier('PhoneLoginPanel'),
+            t.objectExpression([
+              t.objectProperty(t.identifier('onLogin'), t.identifier('onLogin')),
+            ]),
           ],
-          true,
         );
-        const component = t.jsxElement(opening, null, [], true);
         const replacement = t.functionDeclaration(
           t.identifier('LoginPanel'),
           [props],
