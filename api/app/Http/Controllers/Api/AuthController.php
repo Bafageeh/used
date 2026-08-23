@@ -72,11 +72,11 @@ class AuthController extends Controller
             $otp->delete();
             report($e);
             return response()->json([
-                'message' => 'تعذر إرسال رمز التحقق عبر واتساب. حاول مرة أخرى.',
+                'message' => 'تعذر إرسال رمز التحقق. حاول مرة أخرى.',
             ], 502);
         }
 
-        return ['message' => 'تم إرسال رمز التحقق عبر واتساب.', 'expires_in' => 300];
+        return ['message' => 'تم إرسال رمز التحقق.', 'expires_in' => 300];
     }
 
     public function verifyOtp(Request $request)
