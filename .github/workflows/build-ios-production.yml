@@ -35,15 +35,14 @@ jobs:
   check:
     if: github.event_name == 'pull_request'
     runs-on: ubuntu-latest
-    environment: production
-    env:
-      EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
           node-version: 24
-      - name: Check EAS build status
+      - name: Reproduce iOS JavaScript bundle
         working-directory: mobile
         run: |
-          npx --yes eas-cli@latest build:view bd3c67d7-dac9-4078-8e27-125b69c59730 --json
+          rm -f package-lock.json
+          npm install --no-audit --no-fund
+          npx expo export --platform ios --output-dir /tmp/tanazul-ios-export
