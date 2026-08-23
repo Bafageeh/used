@@ -1,32 +1,47 @@
-name: Build Used iOS Production
+name: Validate Tanazul iOS Bundle
 
-# rerun after iOS credentials setup 2026-08-15 20:20 +03
 on:
   push:
     branches: [main]
     paths:
       - ".github/workflows/build-ios-production.yml"
 
+permissions:
+  contents: write
+
 jobs:
-  build:
+  validate:
     runs-on: ubuntu-latest
-    environment: production
-    env:
-      EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
           node-version: 24
-      - name: Install dependencies
-        working-directory: mobile
+      - name: Validate Expo iOS export
+        shell: bash
         run: |
+          set +e
+          cd mobile
           rm -f package-lock.json
-          npm install --no-audit --no-fund
-      - name: Trigger iOS production build
-        working-directory: mobile
+          npm install --no-audit --no-fund > /tmp/tanazul-validation.log 2>&1
+          INSTALL_CODE=$?
+          EXPORT_CODE=99
+          if [ "$INSTALL_CODE" -eq 0 ]; then
+            npx expo export --platform ios --output-dir /tmp/tanazul-ios-export >> /tmp/tanazul-validation.log 2>&1
+            EXPORT_CODE=$?
+          fi
+          cd ..
+          {
+            echo "INSTALL_EXIT_CODE=$INSTALL_CODE"
+            echo "EXPORT_EXIT_CODE=$EXPORT_CODE"
+            echo "--- LAST LOG LINES ---"
+            tail -n 120 /tmp/tanazul-validation.log
+          } > .github/tanazul-ios-validation.txt
+          exit 0
+      - name: Commit validation result
         run: |
-          set -euo pipefail
-          npx --yes eas-cli@latest whoami
-          npx --yes eas-cli@latest project:info --non-interactive
-          npx --yes eas-cli@latest build --platform ios --profile production --non-interactive --no-wait
+          git config user.name "Bafageeh"
+          git config user.email "a.baf@live.com"
+          git add .github/tanazul-ios-validation.txt
+          git commit -m "chore: record Tanazul iOS validation"
+          git push origin main
