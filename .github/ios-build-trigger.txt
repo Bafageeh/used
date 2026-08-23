@@ -1,1 +1,1 @@
-Validate iOS bundle after createElement Babel fix
+Launch verified iOS Build 6 for TestFlight
