@@ -1,17 +1,15 @@
-# retry 2026-08-23
 name: Apply Phone Auth Fix
 
 on:
   push:
     branches: [main]
-    paths:
-      - ".github/workflows/apply-phone-auth-fix.yml"
 
 permissions:
   contents: write
 
 jobs:
   apply:
+    if: github.event.head_commit.message != 'fix: use phone number for user authentication'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -22,6 +20,10 @@ jobs:
 
           p = Path('mobile/App.tsx')
           s = p.read_text()
+
+          # If already fixed, exit cleanly so the follow-up commit does not modify it again.
+          if 'const [registrationOtpSent, setRegistrationOtpSent]' in s:
+              raise SystemExit(0)
 
           def once(old, new, label):
               global s
@@ -126,6 +128,9 @@ jobs:
 
       - name: Commit
         run: |
+          if git diff --quiet -- mobile/App.tsx api/app/Http/Controllers/Api/AuthController.php; then
+            exit 0
+          fi
           git config user.name "Bafageeh"
           git config user.email "a.baf@live.com"
           git add mobile/App.tsx api/app/Http/Controllers/Api/AuthController.php
