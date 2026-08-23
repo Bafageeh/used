@@ -1,1 +1,1 @@
-Reproduce iOS JavaScript bundle failure in CI
+Validate iOS JavaScript bundle after Babel preset fix
