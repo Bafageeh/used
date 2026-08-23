@@ -1,24 +1,128 @@
-name: Check Used iOS Build
+name: Apply Phone Authentication Fix
 
-# recheck 2026-08-15
 on:
   push:
     branches: [main]
     paths:
       - ".github/workflows/check-ios-build.yml"
 
+permissions:
+  contents: write
+
 jobs:
-  check:
+  fix:
     runs-on: ubuntu-latest
-    environment: production
-    env:
-      EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
     steps:
       - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
-        with:
-          node-version: 24
-      - name: Check EAS iOS build status
-        working-directory: mobile
+      - name: Restore phone login and phone registration
         run: |
-          npx --yes eas-cli@latest build:view 8510acf5-801f-4430-a2ec-d9aa85788e1f --json
+          python3 - <<'PY'
+          from pathlib import Path
+
+          p = Path('mobile/App.tsx')
+          s = p.read_text()
+
+          def once(old, new, label):
+              global s
+              count = s.count(old)
+              if count != 1:
+                  raise SystemExit(f'{label}: expected 1 match, found {count}')
+              s = s.replace(old, new, 1)
+
+          once("  const [registrationUsername, setRegistrationUsername] = useState('');\n",
+               "  const [otpCode, setOtpCode] = useState('');\n  const [registrationOtpSent, setRegistrationOtpSent] = useState(false);\n",
+               'registration state')
+
+          once("        const identifier = phone.trim();\n        const credentials = /^\\d/.test(identifier)\n          ? { phone: normalizedPhone() }\n          : { username: identifier.toLowerCase() };\n        if (!/^\\d{4,8}$/.test(pin)) throw new Error('أدخل الرقم السري من 4 إلى 8 أرقام.');\n        result = await request<{ token: string; user: User }>('/auth/login', {\n          method: 'POST', body: JSON.stringify({ ...credentials, pin, device_name: 'Tanazul Mobile' }),\n        });",
+               "        const loginPhone = normalizedPhone();\n        if (!/^\\d{4,8}$/.test(pin)) throw new Error('أدخل الرقم السري من 4 إلى 8 أرقام.');\n        result = await request<{ token: string; user: User }>('/auth/login', {\n          method: 'POST', body: JSON.stringify({ phone: loginPhone, pin, device_name: 'Tanazul Mobile' }),\n        });",
+               'phone login')
+
+          start = s.index('  const registerAccount = async () => {')
+          end = s.index("\n\n  const changeMode = (next: 'user' | 'register' | 'admin') => {", start)
+          new_register = """  const registerAccount = async () => {
+    setBusy(true);
+    try {
+      if (!ageVerified) throw new Error('يجب التحقق من العمر قبل إنشاء الحساب.');
+      if (!termsAccepted) throw new Error('يجب الموافقة على الشروط والأحكام وسياسة الخصوصية أولاً.');
+      if (!name.trim()) throw new Error('أدخل اسمك.');
+      const registrationPhone = normalizedPhone();
+      if (!/^\\d{4,8}$/.test(pin)) throw new Error('اختر رقمًا سريًا من 4 إلى 8 أرقام.');
+
+      if (!registrationOtpSent) {
+        await request<{ message: string; expires_in?: number }>('/auth/request-otp', {
+          method: 'POST',
+          body: JSON.stringify({ phone: registrationPhone, purpose: 'register' }),
+        });
+        setRegistrationOtpSent(true);
+        Alert.alert('رمز التحقق', 'تم إرسال رمز التحقق إلى رقم الجوال المسجل.');
+        return;
+      }
+
+      if (!/^\\d{6}$/.test(otpCode)) throw new Error('أدخل رمز التحقق المكوّن من 6 أرقام.');
+      const result = await request<{ token: string; user: User }>('/auth/verify-otp', {
+        method: 'POST',
+        body: JSON.stringify({
+          phone: registrationPhone,
+          purpose: 'register',
+          code: otpCode,
+          name: name.trim(),
+          pin,
+          device_name: 'Tanazul Mobile',
+        }),
+      });
+      onLogin(result.token, result.user);
+      Alert.alert('تم إنشاء الحساب', 'أصبح حسابك جاهزًا ويمكنك استخدام جميع ميزات تنازل.');
+    } catch (e) {
+      Alert.alert('تعذر إنشاء الحساب', e instanceof Error ? e.message : 'حدث خطأ غير متوقع.');
+    } finally {
+      setBusy(false);
+    }
+  };"""
+          s = s[:start] + new_register + s[end:]
+
+          once("  const changeMode = (next: 'user' | 'register' | 'admin') => {\n    setMode(next);\n    setAgeVerified(false);\n  };",
+               "  const changeMode = (next: 'user' | 'register' | 'admin') => {\n    setMode(next);\n    setAgeVerified(false);\n    setRegistrationOtpSent(false);\n    setOtpCode('');\n  };",
+               'mode reset')
+
+          once("      ? 'أنشئ حسابك من داخل التطبيق باسم مستخدم ورقم سري.'",
+               "      ? 'أنشئ حسابك برقم الجوال ورقم سري، ثم أكّد رمز التحقق.'",
+               'registration help')
+
+          once("        <View style={styles.inputShell}><Ionicons name=\"at-outline\" size={20} color={MUTED} /><TextInput style={styles.inputInner} value={registrationUsername} onChangeText={setRegistrationUsername} placeholder=\"اسم المستخدم بالإنجليزية\" autoCapitalize=\"none\" autoCorrect={false} textAlign=\"right\" /></View>",
+               "        <View style={styles.inputShell}><Ionicons name=\"call-outline\" size={20} color={MUTED} /><TextInput style={styles.inputInner} value={phone} onChangeText={(value) => { setPhone(value); if (registrationOtpSent) { setRegistrationOtpSent(false); setOtpCode(''); } }} placeholder=\"رقم الجوال مثل 05xxxxxxxx\" keyboardType=\"phone-pad\" textContentType=\"telephoneNumber\" autoComplete=\"tel\" textAlign=\"right\" /></View>\n        {registrationOtpSent ? <View style={styles.inputShell}><Ionicons name=\"keypad-outline\" size={20} color={MUTED} /><TextInput style={styles.inputInner} value={otpCode} onChangeText={setOtpCode} placeholder=\"رمز التحقق المكوّن من 6 أرقام\" keyboardType=\"number-pad\" maxLength={6} textContentType=\"oneTimeCode\" autoComplete=\"sms-otp\" textAlign=\"right\" /></View> : null}",
+               'registration phone field')
+
+          once("        <Pressable style={[styles.primaryButton, busy && styles.disabled]} onPress={registerAccount} disabled={busy}>{busy ? <ActivityIndicator color=\"#fff\" /> : <Text style={styles.primaryButtonText}>إنشاء الحساب</Text>}</Pressable>",
+               "        <Pressable style={[styles.primaryButton, busy && styles.disabled]} onPress={registerAccount} disabled={busy}>{busy ? <ActivityIndicator color=\"#fff\" /> : <Text style={styles.primaryButtonText}>{registrationOtpSent ? 'تأكيد وإنشاء الحساب' : 'إرسال رمز التحقق'}</Text>}</Pressable>",
+               'register button')
+
+          once("        <View style={styles.inputShell}><Ionicons name=\"person-outline\" size={20} color={MUTED} /><TextInput style={styles.inputInner} value={phone} onChangeText={setPhone} placeholder=\"رقم الجوال أو اسم المستخدم\" autoCapitalize=\"none\" autoCorrect={false} textAlign=\"right\" /></View>",
+               "        <View style={styles.inputShell}><Ionicons name=\"call-outline\" size={20} color={MUTED} /><TextInput style={styles.inputInner} value={phone} onChangeText={setPhone} placeholder=\"رقم الجوال\" keyboardType=\"phone-pad\" textContentType=\"telephoneNumber\" autoComplete=\"tel\" textAlign=\"right\" /></View>",
+               'login phone field')
+
+          assert 'registrationUsername' not in s
+          assert 'رقم الجوال أو اسم المستخدم' not in s
+          assert 'اسم المستخدم بالإنجليزية' not in s
+          assert 'واتساب' not in s
+          assert "purpose: 'register'" in s
+          assert 'textContentType="oneTimeCode"' in s
+          p.write_text(s)
+          PY
+
+      - name: Validate patch
+        run: |
+          grep -q 'placeholder="رقم الجوال"' mobile/App.tsx
+          grep -q 'placeholder="رقم الجوال مثل 05xxxxxxxx"' mobile/App.tsx
+          grep -q "purpose: 'register'" mobile/App.tsx
+          grep -q 'textContentType="oneTimeCode"' mobile/App.tsx
+          ! grep -q 'رقم الجوال أو اسم المستخدم' mobile/App.tsx
+          ! grep -q 'اسم المستخدم بالإنجليزية' mobile/App.tsx
+          git diff --check
+
+      - name: Commit fix
+        run: |
+          git config user.name "Bafageeh"
+          git config user.email "a.baf@live.com"
+          git add mobile/App.tsx
+          git commit -m "fix: use phone number for user authentication"
+          git push origin main
