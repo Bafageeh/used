@@ -1,0 +1,42 @@
+name: Update Tanazul App Review Notes
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - ".github/review-notes-trigger.txt"
+
+jobs:
+  update_review_notes:
+    runs-on: ubuntu-latest
+    environment: production
+    env:
+      EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - name: Pull current App Store metadata privately
+        working-directory: mobile
+        run: npx --yes eas-cli@latest metadata:pull --profile production --non-interactive
+      - name: Update review notes while preserving existing review credentials
+        working-directory: mobile
+        shell: bash
+        run: |
+          node <<'NODE'
+          const fs = require('fs');
+          const path = 'store.config.json';
+          const config = JSON.parse(fs.readFileSync(path, 'utf8'));
+          config.apple = config.apple || {};
+          config.apple.version = '1.0.1';
+          config.apple.review = config.apple.review || {};
+          config.apple.review.notes = `The app is a marketplace for giving away used items without monetary payment. Selling items for money is not permitted.\n\nWe updated the app name and App Store metadata to comply with Guideline 2.3.7. Pricing references were removed from the app name and subtitle. The core functionality remains unchanged: listed items are offered for transfer without payment.\n\nReviewers can browse listings, view multiple photos, use the map, add favorites, and communicate with listing owners through in-app messaging. Users can report listings and messages and block other users. Location access is optional and is used for nearby listings and adding a location to a listing.`;
+          fs.writeFileSync(path, JSON.stringify(config, null, 2) + '\n');
+          NODE
+      - name: Validate metadata
+        working-directory: mobile
+        run: npx --yes eas-cli@latest metadata:lint --profile production
+      - name: Push review notes
+        working-directory: mobile
+        run: npx --yes eas-cli@latest metadata:push --profile production --non-interactive
