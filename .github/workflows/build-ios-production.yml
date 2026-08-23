@@ -1,11 +1,7 @@
-name: Build Used iOS Production
+name: Build Tanazul iOS Production
 
-# rerun after iOS credentials setup 2026-08-15 20:20 +03
 on:
-  push:
-    branches: [main]
-    paths:
-      - ".github/workflows/build-ios-production.yml"
+  workflow_dispatch:
 
 jobs:
   build:
