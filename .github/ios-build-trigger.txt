@@ -1,1 +1,1 @@
-Validate iOS JavaScript bundle after Babel preset fix
+Validate iOS bundle after createElement Babel fix
