@@ -1,1 +1,1 @@
-Build 5 EAS status check — retry from mobile directory
+Reproduce iOS JavaScript bundle failure in CI
