@@ -2,38 +2,9 @@ name: Tanazul iOS Production
 
 on:
   workflow_dispatch:
-  pull_request:
-    branches: [main]
-    paths:
-      - ".github/ios-build-trigger.txt"
 
 jobs:
   build:
-    if: github.event_name == 'workflow_dispatch'
-    runs-on: ubuntu-latest
-    environment: production
-    env:
-      EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
-        with:
-          node-version: 24
-      - name: Install dependencies
-        working-directory: mobile
-        run: |
-          rm -f package-lock.json
-          npm install --no-audit --no-fund
-      - name: Build and submit iOS production to TestFlight
-        working-directory: mobile
-        run: |
-          set -euo pipefail
-          npx --yes eas-cli@latest whoami
-          npx --yes eas-cli@latest project:info --non-interactive
-          npx --yes eas-cli@latest build --platform ios --profile production --auto-submit --non-interactive
-
-  check:
-    if: github.event_name == 'pull_request'
     runs-on: ubuntu-latest
     environment: production
     env:
