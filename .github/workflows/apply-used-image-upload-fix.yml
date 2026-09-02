@@ -31,5 +31,5 @@ jobs:
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add mobile/App.tsx mobile/index.ts mobile/package.json mobile/package-lock.json
-          git commit -m "Use Expo legacy multipart upload for listing images"
+          git commit -m "Fix iPhone image format when publishing listings"
           git push origin HEAD:main
