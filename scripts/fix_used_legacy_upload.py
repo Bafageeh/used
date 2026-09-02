@@ -28,6 +28,27 @@ if fs_import not in text:
 text = text.replace("import { fetch as expoFetch } from 'expo/fetch';\n", '')
 text = text.replace("import { File } from 'expo-file-system';\n", '')
 
+# iOS may return HEIC/HEIF from the photo library. Laravel currently accepts
+# jpg/jpeg/png/webp only, so ask PHPicker for the most compatible rendition.
+# On iOS this transcodes when needed (typically HEIC -> JPEG); it is ignored
+# on other platforms.
+compatible_line = "      preferredAssetRepresentationMode: ImagePicker.UIImagePickerPreferredAssetRepresentationMode.Compatible,\n"
+create_picker = """      mediaTypes: ['images'],
+      allowsMultipleSelection: true,
+      selectionLimit: remaining,
+      quality: 0.8,
+"""
+if create_picker in text and compatible_line not in text[text.find(create_picker):text.find(create_picker) + len(create_picker) + 180]:
+    text = text.replace(create_picker, create_picker + compatible_line, 1)
+
+edit_picker = """      mediaTypes: ['images'], allowsMultipleSelection: true, selectionLimit: remaining, quality: 0.8,
+"""
+edit_replacement = """      mediaTypes: ['images'], allowsMultipleSelection: true, selectionLimit: remaining, quality: 0.8,
+      preferredAssetRepresentationMode: ImagePicker.UIImagePickerPreferredAssetRepresentationMode.Compatible,
+"""
+if edit_picker in text:
+    text = text.replace(edit_picker, edit_replacement, 1)
+
 old_block = """      const form = new FormData();
       images.forEach((asset, index) => {
         form.append('images[]', {
