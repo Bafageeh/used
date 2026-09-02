@@ -28,7 +28,7 @@ class ListingImage extends Model
 
     public function getUrlAttribute(): string
     {
-        return asset('storage/'.($this->processed_path ?: $this->path));
+        return asset('storage/'.$this->path);
     }
 
     public function getOriginalUrlAttribute(): string
