@@ -3,7 +3,6 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
-use App\Jobs\RemoveListingImageBackground;
 use App\Models\Listing;
 use App\Models\ListingImage;
 use Illuminate\Http\Request;
@@ -22,15 +21,14 @@ class ListingImageController extends Controller
 
         $created = [];
         foreach ($request->file('images') as $image) {
-            // Keep the original permanently. Background removal runs after the HTTP response.
+            // Store and display the original image exactly as uploaded.
+            // Automatic background removal has been disabled.
             $path = $image->store("listings/{$listing->id}/original", 'public');
             $record = $listing->images()->create([
                 'path' => $path,
-                'processing_status' => 'processing',
                 'sort_order' => $listing->images()->count(),
             ]);
 
-            RemoveListingImageBackground::dispatchAfterResponse($record->id);
             $created[] = $record->fresh();
         }
 
