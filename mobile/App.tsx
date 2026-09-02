@@ -667,7 +667,6 @@ function CreateListing({ categories, token, onPublished }: { categories: Categor
           <Pressable style={styles.mediaActionButton} onPress={chooseImages}><Ionicons name="images-outline" size={21} color={PURPLE} /><Text style={styles.mediaActionText}>من الألبوم</Text></Pressable>
           <Pressable style={styles.mediaActionButton} onPress={takePhoto}><Ionicons name="camera-outline" size={21} color={PURPLE} /><Text style={styles.mediaActionText}>تصوير مباشر</Text></Pressable>
         </View>
-        <Text style={{ color: MUTED, fontSize: 11, textAlign: 'right', marginTop: 5 }}>تُزال خلفية الصور تلقائيًا مع الاحتفاظ بالصورة الأصلية.</Text>
         <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.previewRow}>
           {images.map((asset, index) => (
             <View key={`${asset.assetId || asset.uri}-${index}`} style={styles.previewWrap}>
