@@ -1,0 +1,35 @@
+name: Fix iOS Listing Image Upload
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - ".github/workflows/fix-ios-listing-image-upload.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - name: Apply image normalization patch
+        run: python3 scripts/fix_ios_listing_image_upload.py
+      - name: Install dependencies and verify
+        working-directory: mobile
+        run: |
+          rm -f package-lock.json
+          npm install --no-audit --no-fund
+          npx expo install --check
+      - name: Commit patched app
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add mobile/App.tsx mobile/app.json mobile/package.json mobile/package-lock.json
+          git commit -m "Normalize iPhone listing images to JPEG before upload"
+          git push origin HEAD:main
