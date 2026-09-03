@@ -6,6 +6,7 @@ on:
     branches: [main]
     paths:
       - ".github/workflows/build-ios-production.yml"
+      - "mobile/app.json"
 
 jobs:
   build:
