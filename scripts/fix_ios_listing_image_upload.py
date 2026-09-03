@@ -4,7 +4,6 @@ import json
 app_path = Path('mobile/App.tsx')
 text = app_path.read_text()
 
-# Import ImageManipulator for real JPEG conversion (HEIC/HEIF cannot be fixed by changing MIME only).
 anchor = "import * as ImagePicker from 'expo-image-picker';\n"
 imp = "import * as ImageManipulator from 'expo-image-manipulator';\n"
 if imp not in text:
@@ -14,8 +13,8 @@ if imp not in text:
 
 helper_anchor = "async function uploadListingVideo(listingId: number, asset: ImagePicker.ImagePickerAsset, token: string) {"
 helper = '''async function normalizeListingImage(asset: ImagePicker.ImagePickerAsset): Promise<{ uri: string; mimeType: string }> {
-  // iPhone Photos may return HEIC/HEIF even when the multipart MIME is labelled image/jpeg.
-  // Laravel validates the actual bytes, so always re-encode selected images to JPEG before upload.
+  // iPhone Photos can return HEIC/HEIF. Laravel validates the actual bytes,
+  // so changing only the multipart MIME is not enough. Re-encode every image to JPEG.
   const result = await ImageManipulator.manipulateAsync(
     asset.uri,
     [],
@@ -48,12 +47,30 @@ new_create = '''      for (const asset of images) {
           headers: { Accept: 'application/json', Authorization: `Bearer ${token}` },
         });'''
 
-# This exact block appears in create and edit. Replace both.
-count = text.count(old_create)
-if count < 2:
-    raise SystemExit(f'Expected 2 upload blocks, found {count}')
-text = text.replace(old_create, new_create)
+old_edit = '''      for (const asset of newImages) {
+        const upload = await FileSystem.uploadAsync(`${API_URL}/listings/${listing.id}/images`, asset.uri, {
+          httpMethod: 'POST',
+          uploadType: FileSystem.FileSystemUploadType.MULTIPART,
+          fieldName: 'images[]',
+          mimeType: asset.mimeType || 'image/jpeg',
+          headers: { Accept: 'application/json', Authorization: `Bearer ${token}` },
+        });'''
+new_edit = '''      for (const asset of newImages) {
+        const normalized = await normalizeListingImage(asset);
+        const upload = await FileSystem.uploadAsync(`${API_URL}/listings/${listing.id}/images`, normalized.uri, {
+          httpMethod: 'POST',
+          uploadType: FileSystem.FileSystemUploadType.MULTIPART,
+          fieldName: 'images[]',
+          mimeType: normalized.mimeType,
+          headers: { Accept: 'application/json', Authorization: `Bearer ${token}` },
+        });'''
 
+if old_create not in text:
+    raise SystemExit('Create upload block not found')
+if old_edit not in text:
+    raise SystemExit('Edit upload block not found')
+text = text.replace(old_create, new_create, 1)
+text = text.replace(old_edit, new_edit, 1)
 app_path.write_text(text)
 
 pkg_path = Path('mobile/package.json')
