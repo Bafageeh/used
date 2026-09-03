@@ -15,6 +15,7 @@ import {
 } from 'react-native';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import * as ImagePicker from 'expo-image-picker';
+import * as ImageManipulator from 'expo-image-manipulator';
 import * as FileSystem from 'expo-file-system/legacy';
 import * as Location from 'expo-location';
 import * as SecureStore from 'expo-secure-store';
@@ -190,6 +191,17 @@ async function pickVideoAsset(source: 'library' | 'camera') {
   if (!permission.granted) throw new Error('اسمح للتطبيق بالوصول إلى الصور والفيديو.');
   const result = await ImagePicker.launchImageLibraryAsync({ mediaTypes: ['videos'], allowsMultipleSelection: false });
   return result.canceled ? null : validateVideoAsset(result.assets[0]);
+}
+
+async function normalizeListingImage(asset: ImagePicker.ImagePickerAsset): Promise<{ uri: string; mimeType: string }> {
+  // iPhone Photos can return HEIC/HEIF. Laravel validates the actual bytes,
+  // so changing only the multipart MIME is not enough. Re-encode every image to JPEG.
+  const result = await ImageManipulator.manipulateAsync(
+    asset.uri,
+    [],
+    { compress: 0.9, format: ImageManipulator.SaveFormat.JPEG },
+  );
+  return { uri: result.uri, mimeType: 'image/jpeg' };
 }
 
 async function uploadListingVideo(listingId: number, asset: ImagePicker.ImagePickerAsset, token: string) {
@@ -632,11 +644,12 @@ function CreateListing({ categories, token, onPublished }: { categories: Categor
       }, token);
 
       for (const asset of images) {
-        const upload = await FileSystem.uploadAsync(`${API_URL}/listings/${listing.id}/images`, asset.uri, {
+        const normalized = await normalizeListingImage(asset);
+        const upload = await FileSystem.uploadAsync(`${API_URL}/listings/${listing.id}/images`, normalized.uri, {
           httpMethod: 'POST',
           uploadType: FileSystem.FileSystemUploadType.MULTIPART,
           fieldName: 'images[]',
-          mimeType: asset.mimeType || 'image/jpeg',
+          mimeType: normalized.mimeType,
           headers: { Accept: 'application/json', Authorization: `Bearer ${token}` },
         });
         if (upload.status < 200 || upload.status >= 300) {
@@ -844,11 +857,12 @@ function EditListing({
       }, token);
 
       for (const asset of newImages) {
-        const upload = await FileSystem.uploadAsync(`${API_URL}/listings/${listing.id}/images`, asset.uri, {
+        const normalized = await normalizeListingImage(asset);
+        const upload = await FileSystem.uploadAsync(`${API_URL}/listings/${listing.id}/images`, normalized.uri, {
           httpMethod: 'POST',
           uploadType: FileSystem.FileSystemUploadType.MULTIPART,
           fieldName: 'images[]',
-          mimeType: asset.mimeType || 'image/jpeg',
+          mimeType: normalized.mimeType,
           headers: { Accept: 'application/json', Authorization: `Bearer ${token}` },
         });
         if (upload.status < 200 || upload.status >= 300) {

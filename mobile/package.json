@@ -16,7 +16,8 @@
     "expo-secure-store": "~57.0.1",
     "react": "19.2.3",
     "react-native": "0.86.3",
-    "react-native-webview": "13.16.1"
+    "react-native-webview": "13.16.1",
+    "expo-image-manipulator": "~57.0.4"
   },
   "devDependencies": {
     "@types/react": "~19.2.2",
